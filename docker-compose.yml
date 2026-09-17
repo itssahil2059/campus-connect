@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: campus_connect
+      POSTGRES_USER: campus_connect
+      POSTGRES_PASSWORD: campus_connect
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:
