@@ -3,3 +3,4 @@
 | Name | Role | GitHub username |
 | --- | --- | --- |
 | Sahil Bhusal | Software Developer | itssahil2059 |
+| Cezar Herrera | Tech Support | cezar1o1 |
