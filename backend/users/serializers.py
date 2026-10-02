@@ -24,6 +24,10 @@ class SignupSerializer(serializers.ModelSerializer):
             "password": {"write_only": True},
             # The model allows a blank college_name; signup should not.
             "college_name": {"required": True, "allow_blank": False},
+            # Drop DRF's auto-generated unique check (case-sensitive, generic
+            # message). validate_school_email() does a case-insensitive check
+            # instead; the DB unique constraint is still the final guard.
+            "school_email": {"validators": []},
         }
 
     def validate_school_email(self, value):
@@ -33,9 +37,8 @@ class SignupSerializer(serializers.ModelSerializer):
         if not value.endswith(".edu"):
             raise serializers.ValidationError("Please use your .edu school email.")
 
-        # The model's unique=True is case-sensitive, and DRF's built-in unique
-        # check runs before this method, so "A@x.edu" would slip past it when
-        # "a@x.edu" already exists. Check again case-insensitively.
+        # Case-insensitive duplicate check, so "A@x.edu" is rejected when
+        # "a@x.edu" already exists (the model's unique=True is case-sensitive).
         if CustomUser.objects.filter(school_email__iexact=value).exists():
             raise serializers.ValidationError(
                 "An account with this email already exists."
@@ -69,10 +72,12 @@ class SignupSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         password = validated_data.pop("password")
         # create_user() hashes the password. school_email, college_name, etc.
-        # go through **extra_fields. New accounts start unverified; the
-        # email-verification step flips is_edu_verified later.
+        # go through **extra_fields. New accounts start inactive and
+        # unverified: Django's authenticate() refuses inactive users, so they
+        # can't log in until the email-verification step flips both flags.
         return CustomUser.objects.create_user(
             password=password,
+            is_active=False,
             is_edu_verified=False,
             **validated_data,
         )

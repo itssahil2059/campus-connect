@@ -5,7 +5,7 @@ from .serializers import SignupSerializer, UserPublicSerializer
 
 
 class SignupView(generics.CreateAPIView):
-    """POST /api/users/signup/ — create an unverified account."""
+    """POST /api/auth/signup/ — create an inactive, unverified account."""
 
     serializer_class = SignupSerializer
 
