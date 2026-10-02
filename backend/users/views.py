@@ -1,6 +1,7 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 
+from .emails import send_verification_email
 from .serializers import SignupSerializer, UserPublicSerializer
 
 
@@ -20,6 +21,7 @@ class SignupView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        send_verification_email(request, user)
 
         # Respond with the public serializer, not SignupSerializer, so nothing
         # password-related is echoed back. No token yet: the user has to

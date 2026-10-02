@@ -104,6 +104,16 @@ REST_FRAMEWORK = {
     ],
 }
 
+# --- Email ---
+# Console backend prints emails in the runserver terminal (local dev).
+# In production, override via .env to send real mail (AWS SES).
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend'
+)
+DEFAULT_FROM_EMAIL = os.environ.get(
+    'DEFAULT_FROM_EMAIL', 'Git Together <no-reply@gittogether.local>'
+)
+
 # --- CORS (local frontend dev servers) ---
 CORS_ALLOWED_ORIGINS = os.environ.get(
     'CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173'
