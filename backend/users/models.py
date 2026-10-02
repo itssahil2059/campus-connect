@@ -8,6 +8,7 @@ class CustomUser(AbstractUser):
     (e.g. quiz-answer fields for matching, safety/emergency contact,
     verification status/document reference).
     """
+    school_email = "school_email"
     school_email = models.EmailField(
         unique=True,
         help_text="Must be a verified .edu address.",
