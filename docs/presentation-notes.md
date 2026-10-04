@@ -234,6 +234,36 @@ requires login.
 
 ---
 
+## 4. Frontend click-through (branch `sa4-frontend-flow`)
+
+**Pages:** Signup → Check your email → Verify → Login → Profile setup
+(profile + questionnaire) → Home (cards of other students) → a single
+profile view. Built with React + TypeScript + Tailwind; mobile-friendly.
+
+**How it fits together (talking points)**
+- *Auth state:* after login the token goes in `localStorage`, and an
+  `AuthProvider` makes the current user available to every page. On reload
+  it calls `/api/auth/me/` to restore the session, and drops the token if
+  it's no longer valid.
+- *Protected routes:* `RequireAuth` sends logged-out visitors to `/login`.
+- *Smart redirect after login:* first-time users (where `/api/profiles/me/`
+  returns 404) go to profile setup; returning users go straight to Home.
+- *Server errors shown in the form:* the API's validation messages
+  (".edu only", "already exists", weak password) appear right under the
+  matching field.
+- *Design:* warm neutral palette, one accent color, serif headings, cards
+  and tag chips. A placeholder design, to be replaced with the team's UX
+  screenshots later.
+- `python manage.py seed_demo` adds 6 sample verified students so the Home
+  feed isn't empty during demos.
+
+**Bug found during browser testing:** a wrong password showed *no* error on
+the login page. The general "Invalid email or password." message was being
+treated as a form-field error, which hid the error box. Fixed in the
+shared API helper, so every form benefits.
+
+---
+
 ## Git workflow (worth mentioning — version control is 25% of the grade)
 - Feature branches per task (`sa1-api-docs`, `sa2-auth`), merged into `dev`
   via pull requests. Teammates use the same flow (`setup-cezar`,
@@ -246,8 +276,11 @@ requires login.
 ---
 
 ## Possible demo script (fill in as features land)
-1. Show signup rejecting a `@gmail.com` address.
-2. Sign up with a `.edu` address → show the user is inactive in the admin.
-3. Show the verification link printed in the terminal,
-   click it, then log in and call `/api/auth/me/` with the token.
+1. Open http://localhost:5173/signup and try a `@gmail.com` address → error
+   under the email field.
+2. Sign up with a `.edu` address → "Check your inbox" page.
+3. Copy the link from the Django terminal and open it → "You're verified".
+4. Log in (try a wrong password first to show the error) → profile setup.
+5. Fill in bio, interests and the questionnaire → Finish setup → Home shows
+   other students; click a card to open their profile.
 4. *(after step e)* Run the test suite live: `pytest`.

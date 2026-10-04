@@ -13,22 +13,66 @@ function convertKeys(data: unknown, fn: (k: string) => string): unknown {
   return data;
 }
 
+/** Thrown for any non-2xx response. `data` is the (camelCased) JSON error body. */
+export class ApiError extends Error {
+  status: number;
+  data: Record<string, unknown>;
+
+  constructor(status: number, data: Record<string, unknown>) {
+    super(`Request failed: ${status}`);
+    this.status = status;
+    this.data = data;
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = localStorage.getItem("token");
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Token ${token}` } : {}),
-    },
-    body: body === undefined ? undefined : JSON.stringify(convertKeys(body, toSnake)),
-  });
-  if (!res.ok) throw new Error(`${method} ${path} failed: ${res.status}`);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Token ${token}` } : {}),
+      },
+      body: body === undefined ? undefined : JSON.stringify(convertKeys(body, toSnake)),
+    });
+  } catch {
+    // fetch only throws when the server can't be reached at all.
+    throw new ApiError(0, { detail: "Can't reach the server. Is the backend running?" });
+  }
   if (res.status === 204) return undefined as T;
-  return convertKeys(await res.json(), toCamel) as T;
+  const json = convertKeys(await res.json().catch(() => ({})), toCamel);
+  if (!res.ok) throw new ApiError(res.status, json as Record<string, unknown>);
+  return json as T;
 }
 
 export const apiGet = <T>(path: string) => request<T>("GET", path);
 export const apiPost = <T>(path: string, body?: unknown) => request<T>("POST", path, body);
 export const apiPut = <T>(path: string, body?: unknown) => request<T>("PUT", path, body);
 export const apiDelete = <T>(path: string) => request<T>("DELETE", path);
+
+/** First error message per field, e.g. { schoolEmail: "Please use your .edu school email." } */
+export function fieldErrors(err: unknown): Record<string, string> {
+  if (!(err instanceof ApiError)) return {};
+  const out: Record<string, string> = {};
+  for (const [field, value] of Object.entries(err.data)) {
+    // nonFieldErrors isn't a form field; errorMessage() handles it.
+    if (field === "nonFieldErrors") continue;
+    if (Array.isArray(value) && typeof value[0] === "string") out[field] = value[0];
+  }
+  return out;
+}
+
+/** One human-readable message for errors that aren't tied to a form field. */
+export function errorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    const { detail, nonFieldErrors } = err.data as {
+      detail?: string;
+      nonFieldErrors?: string[];
+    };
+    if (detail) return detail;
+    if (nonFieldErrors?.length) return nonFieldErrors[0];
+  }
+  return "Something went wrong. Please try again.";
+}
