@@ -118,6 +118,10 @@ DEFAULT_FROM_EMAIL = os.environ.get(
     'DEFAULT_FROM_EMAIL', 'Git Together <no-reply@gittogether.local>'
 )
 
+# Where the React app runs. Emailed links (e.g. email verification) point
+# here; the frontend page then calls the API.
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+
 # --- CORS (local frontend dev servers) ---
 CORS_ALLOWED_ORIGINS = os.environ.get(
     'CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173'

@@ -29,7 +29,7 @@ class SignupView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        send_verification_email(request, user)
+        send_verification_email(user)
 
         # Respond with the public serializer, not SignupSerializer, so nothing
         # password-related is echoed back. No token yet: the user has to

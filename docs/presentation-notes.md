@@ -162,6 +162,16 @@ of each section.
   twice. Removed the duplicate and added a **regression test** (a test
   that keeps the bug from coming back).
 
+- **Email verification: 10 tests.** They cover: the full flow (sign up → read
+  the link out of the email → verify → log in); an unverified user can't log
+  in; a tampered token, another user's token, and garbage uids are all
+  rejected; an already-verified user gets "already verified"; an old link
+  can't reactivate a banned user; the link stops working after the first
+  login.
+- Changed the email link to open the **frontend's** `/verify/<uid>/<token>`
+  page (set by the `FRONTEND_URL` setting), which then calls the API. The
+  user sees a proper page instead of raw JSON.
+
 **Talking point:** the API tests run in about a second, so they can run
 before every commit. Pairing every bug fix with a test is how you keep it
 fixed.
