@@ -255,3 +255,83 @@ class TestEmailVerification:
 
         # last_login changed, so the token no longer matches.
         assert response.status_code == 400
+
+
+@pytest.mark.django_db
+class TestLoginLogoutMe:
+    ME_URL = reverse("users:me")
+    LOGOUT_URL = reverse("users:logout")
+
+    def login(self, api_client, email="alice@tamut.edu", password=PASSWORD):
+        return api_client.post(
+            LOGIN_URL, {"school_email": email, "password": password}, format="json"
+        )
+
+    def test_login_returns_token_and_user(self, api_client, make_user):
+        make_user()
+
+        response = self.login(api_client)
+
+        assert response.status_code == 200
+        assert len(response.data["token"]) == 40
+        assert response.data["user"]["school_email"] == "alice@tamut.edu"
+        assert "password" not in response.data["user"]
+
+    def test_login_email_is_case_insensitive(self, api_client, make_user):
+        make_user()
+
+        assert self.login(api_client, email="ALICE@Tamut.edu").status_code == 200
+
+    def test_login_sets_last_login(self, api_client, make_user):
+        user = make_user()
+
+        self.login(api_client)
+
+        user.refresh_from_db()
+        assert user.last_login is not None
+
+    def test_logging_in_twice_reuses_the_same_token(self, api_client, make_user):
+        make_user()
+
+        first = self.login(api_client).data["token"]
+        second = self.login(api_client).data["token"]
+
+        assert first == second
+
+    @pytest.mark.parametrize(
+        "email, password",
+        [("alice@tamut.edu", "wrong-Pass-99"), ("nobody@tamut.edu", PASSWORD)],
+    )
+    def test_bad_credentials_get_one_generic_message(
+        self, api_client, make_user, email, password
+    ):
+        make_user()
+
+        response = self.login(api_client, email=email, password=password)
+
+        assert response.status_code == 400
+        assert response.data["non_field_errors"] == ["Invalid email or password."]
+
+    def test_me_returns_current_user(self, api_client, make_user):
+        make_user()
+        token = self.login(api_client).data["token"]
+
+        response = api_client.get(self.ME_URL, HTTP_AUTHORIZATION=f"Token {token}")
+
+        assert response.status_code == 200
+        assert response.data["username"] == "alice"
+
+    def test_me_requires_login(self, api_client):
+        assert api_client.get(self.ME_URL).status_code == 401
+
+    def test_logout_revokes_token(self, api_client, make_user):
+        make_user()
+        token = self.login(api_client).data["token"]
+        auth = {"HTTP_AUTHORIZATION": f"Token {token}"}
+
+        assert api_client.post(self.LOGOUT_URL, **auth).status_code == 204
+        # The same token no longer works.
+        assert api_client.get(self.ME_URL, **auth).status_code == 401
+
+    def test_logout_requires_login(self, api_client):
+        assert api_client.post(self.LOGOUT_URL).status_code == 401

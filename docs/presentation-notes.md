@@ -172,6 +172,20 @@ of each section.
   page (set by the `FRONTEND_URL` setting), which then calls the API. The
   user sees a proper page instead of raw JSON.
 
+- **Login / logout / me: 10 tests.** They cover: login returns a 40-character
+  token with no password in the response; the email is case-insensitive;
+  `last_login` gets recorded; logging in twice reuses the same token; a wrong
+  password and an unknown email get the same generic message; `/me/` works
+  with a token and returns 401 without one; logout revokes the token
+  (afterwards it gets 401); logout itself requires being logged in.
+- **Total: 34 API tests, all passing in about 3 seconds.**
+
+**Why token auth instead of sessions:** the React app runs on a different
+port (5173) from the API (8000). With a token, the frontend just sends one
+`Authorization: Token …` header. Session cookies would need cross-site
+cookie and CSRF configuration between the two ports. Tokens are also
+stored in the database, so logout revokes them immediately.
+
 **Talking point:** the API tests run in about a second, so they can run
 before every commit. Pairing every bug fix with a test is how you keep it
 fixed.
