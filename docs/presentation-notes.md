@@ -189,7 +189,48 @@ stored in the database, so logout revokes them immediately.
 **Talking point:** the API tests run in about a second, so they can run
 before every commit. Pairing every bug fix with a test is how you keep it
 fixed.
-### Step (f): Push branch + pull request into `dev` — *not started*
+### Step (f): Push branch + pull request into `dev`
+- `sa2-auth` is pushed to GitHub; the pull request into `dev` is still to open.
+
+---
+
+## 3. SA3 — Profile + preference questionnaire (branch `sa3-profiles`)
+
+**What it does**
+- New **`profiles` app**, kept separate from `users`, so login data and
+  profile data stay apart.
+- **Profile** (one per user): bio, plus interests, likes and dislikes as short
+  tag lists. Tags are trimmed, lowercased and de-duplicated; maximum 15
+  per list.
+- **Questionnaire:** `Question` (text + answer choices) and `Answer` (one per
+  user per question, enforced by a database constraint). Five starter
+  questions are loaded by a **data migration**, so every teammate's database
+  and production get the same questions automatically.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET / PUT /api/profiles/me/` | My profile. GET returns 404 until it's set up, which tells the frontend to show the setup page. PUT creates or updates it. |
+| `GET /api/profiles/` | Home feed: other **verified, active** users who have a profile |
+| `GET /api/profiles/<id>/` | One other student's profile |
+| `GET /api/questions/` | The questionnaire |
+| `GET / POST /api/answers/` | My answers. POST saves a list, replacing earlier answers. |
+
+**Talking points**
+- *Privacy:* other users' profiles never include their email. There are two
+  serializers: one for "me" and a public one for everyone else.
+- *Safety:* the Home feed only shows verified, active users, so unverified
+  or banned accounts never appear.
+- *All-or-nothing saves:* answers are saved in a database transaction. If
+  one answer is invalid, none are saved.
+- *Questions live in the database*, not hard-coded, so new questions can be
+  added from the admin without changing code.
+
+**Tests: 15 new, 49 total, all passing.** They cover: 404 before setup;
+create then update; tag cleanup; tag limit; the feed excludes yourself,
+unverified, banned and profile-less users; no email in public profiles;
+questions seeded in order; answers saved, replaced, and invalid choices
+roll back the whole batch; you only see your own answers; every endpoint
+requires login.
 
 ---
 

@@ -71,7 +71,8 @@ after the demo unless Sahil says otherwise.
 campus-connect/
   backend/
     core/        Django project (settings, urls, asgi/wsgi)
-    users/       Custom user model + auth/verification (in progress)
+    users/       Custom user model + auth/verification (signup, verify, login, logout, me)
+    profiles/    Profile (bio, interests/likes/dislikes) + questionnaire (Question/Answer)
   docker-compose.yml   Postgres + Redis for local dev
   frontend/            Not created yet
 ```

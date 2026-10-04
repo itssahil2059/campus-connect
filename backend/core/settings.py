@@ -33,6 +33,7 @@ INSTALLED_APPS = [
 
     # local apps
     'users',
+    'profiles',
 ]
 
 AUTH_USER_MODEL = 'users.CustomUser'
