@@ -107,7 +107,47 @@ of each section.
 - Set `EMAIL_FIELD = "school_email"` on the user model so the token is tied
   to the school email: changing the email invalidates old links. This is a
   class setting, so no database migration was needed.
-### Step (d): Verify / login / logout / me — *not started*
+### Step (d): Verify / login / logout / me
+**What it does**
+| Endpoint | Access | Result |
+|---|---|---|
+| `GET /api/auth/verify/<uid>/<token>/` | anyone with the link | Activates the account (`is_active` + `is_edu_verified`) |
+| `POST /api/auth/login/` | anyone | School email + password → auth token (active users only) |
+| `POST /api/auth/logout/` | logged in | Deletes the token so it stops working immediately |
+| `GET /api/auth/me/` | logged in | Returns the current user |
+
+- Uses DRF **token authentication**: the client sends
+  `Authorization: Token <key>` on each request. The token is stored
+  server-side, so logout truly revokes it (unlike a stateless JWT, which
+  stays valid until it expires).
+
+**Talking points (security decisions)**
+- *No account enumeration:* "no such email" and "wrong password" return the
+  same message, "Invalid email or password." The "please verify your email
+  first" hint is only shown when the password is correct.
+- *Verification links can't undo a ban:* verify checks `is_edu_verified`,
+  not `is_active`, so if an admin deactivates a verified user, an old link
+  can't reactivate them.
+- *Links stop working after first login:* login updates `last_login`, which
+  is part of the token's hash, so the verification link becomes invalid.
+- *Correct HTTP status codes:* found that "not logged in" returned `403`
+  instead of `401`, because DRF builds the response from the first
+  authentication class. Reordering the classes fixed it, so the frontend
+  can reliably tell "not logged in" (401) from "not allowed" (403).
+
+**Manual end-to-end test results (curl)**
+| Test | Expected | Result |
+|---|---|---|
+| Login before verifying | 400 "verify your email first" | ✅ |
+| Login with wrong password | 400 generic message | ✅ |
+| Tampered token / garbage uid | 400 invalid link | ✅ |
+| Real verification link | 200 verified | ✅ |
+| Same link again | 200 already verified | ✅ |
+| Login (any email case) | 200 + token | ✅ |
+| `/me/` with token | 200 user data | ✅ |
+| `/me/` without token | 401 | ✅ (after fix; was 403) |
+| Logout, then `/me/` with old token | 204, then 401 | ✅ |
+| Verification link after login | 400 invalid | ✅ |
 ### Step (e): Automated tests — *not started*
 ### Step (f): Push branch + pull request into `dev` — *not started*
 
@@ -127,6 +167,6 @@ of each section.
 ## Possible demo script (fill in as features land)
 1. Show signup rejecting a `@gmail.com` address.
 2. Sign up with a `.edu` address → show the user is inactive in the admin.
-3. *(after step c/d)* Show the verification link printed in the terminal,
+3. Show the verification link printed in the terminal,
    click it, then log in and call `/api/auth/me/` with the token.
 4. *(after step e)* Run the test suite live: `pytest`.

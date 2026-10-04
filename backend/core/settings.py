@@ -27,6 +27,7 @@ INSTALLED_APPS = [
 
     # third-party
     'rest_framework',
+    'rest_framework.authtoken',  # Token table for TokenAuthentication
     'corsheaders',
     'channels',
 
@@ -95,9 +96,12 @@ CHANNEL_LAYERS = {
 
 # --- DRF ---
 REST_FRAMEWORK = {
+    # Token first: DRF uses the first class to build the 401 response, and
+    # SessionAuthentication has no WWW-Authenticate header, so it would turn
+    # "not logged in" into 403. Session auth stays for the browsable API/admin.
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',

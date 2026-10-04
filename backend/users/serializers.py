@@ -83,8 +83,35 @@ class SignupSerializer(serializers.ModelSerializer):
         )
 
 
+class LoginSerializer(serializers.Serializer):
+    # Plain Serializer (not ModelSerializer): login doesn't create or update a
+    # model, it just validates input and finds the matching user.
+    school_email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        user = CustomUser.objects.filter(
+            school_email__iexact=attrs["school_email"]
+        ).first()
+
+        # Same message for "no such email" and "wrong password", so the
+        # response doesn't reveal which one was wrong.
+        if user is None or not user.check_password(attrs["password"]):
+            raise serializers.ValidationError("Invalid email or password.")
+
+        # Only reached with the correct password, so this message is safe.
+        if not user.is_active:
+            raise serializers.ValidationError(
+                "Please verify your email before logging in."
+            )
+
+        # The view reads the user from serializer.validated_data["user"].
+        attrs["user"] = user
+        return attrs
+
+
 class UserPublicSerializer(serializers.ModelSerializer):
-    """What the signup response returns: no password, no internal flags."""
+    """Safe user data for API responses: no password, no internal flags."""
 
     class Meta:
         model = CustomUser
