@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from .emails import send_verification_email
 from .models import CustomUser
-from .serializers import LoginSerializer, SignupSerializer, UserPublicSerializer
+from .serializers import LoginSerializer, SignupSerializer, UserSelfSerializer
 
 
 class SignupView(generics.CreateAPIView):
@@ -35,7 +35,7 @@ class SignupView(generics.CreateAPIView):
         # password-related is echoed back. No token yet: the user has to
         # verify their .edu email first.
         return Response(
-            UserPublicSerializer(user).data,
+            UserSelfSerializer(user).data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -91,7 +91,7 @@ class LoginView(APIView):
         # invalidates any outstanding verification link for this user.
         update_last_login(None, user)
 
-        return Response({"token": token.key, "user": UserPublicSerializer(user).data})
+        return Response({"token": token.key, "user": UserSelfSerializer(user).data})
 
 
 class LogoutView(APIView):
@@ -105,7 +105,7 @@ class LogoutView(APIView):
 class MeView(generics.RetrieveAPIView):
     """GET /api/auth/me/ — the currently logged-in user."""
 
-    serializer_class = UserPublicSerializer
+    serializer_class = UserSelfSerializer
 
     def get_object(self):
         # No lookup by id: "me" is always whoever the token belongs to.

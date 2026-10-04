@@ -148,7 +148,23 @@ of each section.
 | `/me/` without token | 401 | ✅ (after fix; was 403) |
 | Logout, then `/me/` with old token | 204, then 401 | ✅ |
 | Verification link after login | 400 invalid | ✅ |
-### Step (e): Automated tests — *not started*
+### Step (e): Automated tests (pytest)
+- Added **pytest + pytest-django**. Run with `cd backend && pytest`. Tests use
+  a separate throwaway test database, so real data is never touched.
+- **Signup: 14 tests**, all passing. They cover: the user is created inactive
+  and unverified; the password is stored hashed; no password fields in the
+  response; email lowercased; verification email sent; non-.edu emails
+  rejected (`gmail.com`, `tamut.edu.com`, `tamut.org`); duplicate email
+  rejected in any letter case; password mismatch; password too similar to
+  the school email; common password; missing college.
+- Found while verifying the password-similarity fix: the similarity
+  validator was listed twice in settings, so users saw the same error
+  twice. Removed the duplicate and added a **regression test** (a test
+  that keeps the bug from coming back).
+
+**Talking point:** the API tests run in about a second, so they can run
+before every commit. Pairing every bug fix with a test is how you keep it
+fixed.
 ### Step (f): Push branch + pull request into `dev` — *not started*
 
 ---

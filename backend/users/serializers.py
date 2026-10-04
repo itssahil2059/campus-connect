@@ -110,8 +110,12 @@ class LoginSerializer(serializers.Serializer):
         return attrs
 
 
-class UserPublicSerializer(serializers.ModelSerializer):
-    """Safe user data for API responses: no password, no internal flags."""
+class UserSelfSerializer(serializers.ModelSerializer):
+    """The logged-in user's own account data (includes their email).
+
+    Only for responses about yourself (signup, login, /me). Other users'
+    profiles will get a separate serializer without the email.
+    """
 
     class Meta:
         model = CustomUser
