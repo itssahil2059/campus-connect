@@ -128,9 +128,10 @@ python manage.py runserver
 
 ## Build order (dependency-first — build in this order, don't jump ahead)
 1. **User auth + .edu verification** — signup, login, school-email domain check,
-   email verification via `default_token_generator`. **Endpoints done (signup, verify, login, logout, me); tests in progress.**
+   email verification via `default_token_generator`. **Done, with pytest + Selenium tests.**
 2. Profile creation + preference quiz (incl. image upload via S3, and an
-   "insert links" field).
+   "insert links" field). **Profile + questionnaire API and pages done; image
+   upload and links field not yet.**
 3. Suggested Interest / discovery feed — looser, randomized browse surface
    ("like YouTube subscriptions" per the team's own description).
 4. Search/Filter — precise narrowing (name, college, interests, likes/dislikes).
@@ -164,11 +165,10 @@ deploy working after step 1 or 2 so it's not a last-week scramble.
   in lecture.
 
 ## Not yet built
-- Auth tests (pytest) — in progress; endpoints themselves are built
 - Matching app (quiz model + weighted scoring engine)
 - Discovery/search apps
 - Chat app (Channels consumers/routing)
 - Safety app (walk-me-back, trusted-friend check-in)
-- Frontend (React + Vite + TS + Tailwind)
-- Test suites (unit via pytest, UI via Selenium) — required for grading
+- Frontend beyond the demo flow (signup/verify/login/profile setup/home/profile
+  view exist on branch sa4-frontend-flow; landing page "/" is Trinity's tr1-home-page)
 - AWS deployment (EC2/RDS/S3/CloudFront) — not attempted yet
