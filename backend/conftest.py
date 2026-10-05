@@ -1,9 +1,8 @@
 import pytest
 from rest_framework.test import APIClient
 
+from core.testing import PASSWORD
 from users.models import CustomUser
-
-PASSWORD = "blue-Otter-42!"
 
 
 @pytest.fixture

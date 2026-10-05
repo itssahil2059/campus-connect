@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 
-from conftest import PASSWORD
+from core.testing import PASSWORD
 from users.models import CustomUser
 
 SIGNUP_URL = reverse("users:signup")

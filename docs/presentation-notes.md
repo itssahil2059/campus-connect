@@ -264,6 +264,28 @@ shared API helper, so every form benefits.
 
 ---
 
+## 5. UI automation tests (Selenium) — instructor requirement
+
+- `backend/tests_ui/`: **7 browser tests**, run with `cd backend && pytest tests_ui`
+  (add `HEADED=1` in front to watch Chrome click through it live).
+- Each run starts its **own** test Django server (on a throwaway test
+  database) and its own React dev server pointed at it, then drives real
+  Chrome. It never touches real data and doesn't depend on servers you
+  already have running.
+- Covered: signup rejects non-.edu email; signup rejects a duplicate email
+  (any case); **full flow** signup → open the emailed link → verified →
+  login → profile setup; wrong password shows an error; unverified user is
+  blocked; verified user lands on Home and can log out (token cleared);
+  logged-out visitor sent to login.
+- **Totals: 49 API tests + 7 UI tests = 56, all passing (about 13 seconds).**
+
+**Talking point:** unit/API tests check each rule quickly. UI tests prove
+the real pages, the React code and the API work together, like a user
+clicking through. Selenium reads the verification link from the captured
+test email, so even the "check your email" step is automated.
+
+---
+
 ## Git workflow (worth mentioning — version control is 25% of the grade)
 - Feature branches per task (`sa1-api-docs`, `sa2-auth`), merged into `dev`
   via pull requests. Teammates use the same flow (`setup-cezar`,
@@ -283,4 +305,5 @@ shared API helper, so every form benefits.
 4. Log in (try a wrong password first to show the error) → profile setup.
 5. Fill in bio, interests and the questionnaire → Finish setup → Home shows
    other students; click a card to open their profile.
-4. *(after step e)* Run the test suite live: `pytest`.
+6. Run the tests live: `pytest` (API) and `HEADED=1 pytest tests_ui` (watch
+   Chrome click through signup and login on its own).
