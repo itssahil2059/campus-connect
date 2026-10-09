@@ -17,6 +17,15 @@ wants to attempt things himself first and have mistakes pointed out, rather than
 getting full implementations handed to him by default — ask before writing a large
 chunk of a new feature outright; smaller mechanical fixes are fine to just make.
 
+**Current override: demo push (Oct 4 2026 → prototype demo Mon Oct 5 2026).**
+For this push, write complete code directly (don't wait for Sahil to attempt
+it first), and explain each step in 2–3 sentences he can reuse when presenting.
+After each step: run the tests, fix failures, commit. Still ask before anything
+risky. Scope is one click-through flow only: signup → email verification →
+login → profile + preference questionnaire → home page listing other users'
+profiles. No chat, matching, search, or AWS. Revert to the default mode above
+after the demo unless Sahil says otherwise.
+
 ## Team
 - Software Developer: Sahil Bhusal (this repo's primary user)
 - Tech Support: Cezar Herrera
@@ -62,7 +71,8 @@ chunk of a new feature outright; smaller mechanical fixes are fine to just make.
 campus-connect/
   backend/
     core/        Django project (settings, urls, asgi/wsgi)
-    users/       Custom user model + auth/verification (in progress)
+    users/       Custom user model + auth/verification (signup, verify, login, logout, me)
+    profiles/    Profile (bio, interests/likes/dislikes) + questionnaire (Question/Answer)
   docker-compose.yml   Postgres + Redis for local dev
   frontend/            Not created yet
 ```
@@ -118,9 +128,10 @@ python manage.py runserver
 
 ## Build order (dependency-first — build in this order, don't jump ahead)
 1. **User auth + .edu verification** — signup, login, school-email domain check,
-   email verification via `default_token_generator`. **← current step.**
+   email verification via `default_token_generator`. **Done, with pytest + Selenium tests.**
 2. Profile creation + preference quiz (incl. image upload via S3, and an
-   "insert links" field).
+   "insert links" field). **Profile + questionnaire API and pages done; image
+   upload and links field not yet.**
 3. Suggested Interest / discovery feed — looser, randomized browse surface
    ("like YouTube subscriptions" per the team's own description).
 4. Search/Filter — precise narrowing (name, college, interests, likes/dislikes).
@@ -154,11 +165,10 @@ deploy working after step 1 or 2 so it's not a last-week scramble.
   in lecture.
 
 ## Not yet built
-- Auth endpoints (.edu domain check, verification, login) — in progress now
 - Matching app (quiz model + weighted scoring engine)
 - Discovery/search apps
 - Chat app (Channels consumers/routing)
 - Safety app (walk-me-back, trusted-friend check-in)
-- Frontend (React + Vite + TS + Tailwind)
-- Test suites (unit via pytest, UI via Selenium) — required for grading
+- Frontend beyond the demo flow (signup/verify/login/profile setup/home/profile
+  view exist on branch sa4-frontend-flow; landing page "/" is Trinity's tr1-home-page)
 - AWS deployment (EC2/RDS/S3/CloudFront) — not attempted yet

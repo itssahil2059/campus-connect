@@ -27,11 +27,13 @@ INSTALLED_APPS = [
 
     # third-party
     'rest_framework',
+    'rest_framework.authtoken',  # Token table for TokenAuthentication
     'corsheaders',
     'channels',
 
     # local apps
     'users',
+    'profiles',
 ]
 
 AUTH_USER_MODEL = 'users.CustomUser'
@@ -95,14 +97,31 @@ CHANNEL_LAYERS = {
 
 # --- DRF ---
 REST_FRAMEWORK = {
+    # Token first: DRF uses the first class to build the 401 response, and
+    # SessionAuthentication has no WWW-Authenticate header, so it would turn
+    # "not logged in" into 403. Session auth stays for the browsable API/admin.
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
+
+# --- Email ---
+# Console backend prints emails in the runserver terminal (local dev).
+# In production, override via .env to send real mail (AWS SES).
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend'
+)
+DEFAULT_FROM_EMAIL = os.environ.get(
+    'DEFAULT_FROM_EMAIL', 'Git Together <no-reply@gittogether.local>'
+)
+
+# Where the React app runs. Emailed links (e.g. email verification) point
+# here; the frontend page then calls the API.
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 
 # --- CORS (local frontend dev servers) ---
 CORS_ALLOWED_ORIGINS = os.environ.get(
@@ -112,16 +131,16 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
 # --- Password validation ---
 AUTH_PASSWORD_VALIDATORS = [
     {
-    'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    'OPTIONS': {
+        # Default attributes plus school_email, so passwords like
+        # "jdoe2026" are rejected for jdoe@school.edu.
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        'OPTIONS': {
             'user_attributes': ('username', 'first_name', 'last_name', 'email', 'school_email'),
-    },
+        },
     },
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
-    
 ]
 
 LANGUAGE_CODE = 'en-us'

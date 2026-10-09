@@ -24,6 +24,10 @@ class SignupSerializer(serializers.ModelSerializer):
             "password": {"write_only": True},
             # The model allows a blank college_name; signup should not.
             "college_name": {"required": True, "allow_blank": False},
+            # Drop DRF's auto-generated unique check (case-sensitive, generic
+            # message). validate_school_email() does a case-insensitive check
+            # instead; the DB unique constraint is still the final guard.
+            "school_email": {"validators": []},
         }
 
     def validate_school_email(self, value):
@@ -33,9 +37,8 @@ class SignupSerializer(serializers.ModelSerializer):
         if not value.endswith(".edu"):
             raise serializers.ValidationError("Please use your .edu school email.")
 
-        # The model's unique=True is case-sensitive, and DRF's built-in unique
-        # check runs before this method, so "A@x.edu" would slip past it when
-        # "a@x.edu" already exists. Check again case-insensitively.
+        # Case-insensitive duplicate check, so "A@x.edu" is rejected when
+        # "a@x.edu" already exists (the model's unique=True is case-sensitive).
         if CustomUser.objects.filter(school_email__iexact=value).exists():
             raise serializers.ValidationError(
                 "An account with this email already exists."
@@ -69,17 +72,50 @@ class SignupSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         password = validated_data.pop("password")
         # create_user() hashes the password. school_email, college_name, etc.
-        # go through **extra_fields. New accounts start unverified; the
-        # email-verification step flips is_edu_verified later.
+        # go through **extra_fields. New accounts start inactive and
+        # unverified: Django's authenticate() refuses inactive users, so they
+        # can't log in until the email-verification step flips both flags.
         return CustomUser.objects.create_user(
             password=password,
+            is_active=False,
             is_edu_verified=False,
             **validated_data,
         )
 
 
-class UserPublicSerializer(serializers.ModelSerializer):
-    """What the signup response returns: no password, no internal flags."""
+class LoginSerializer(serializers.Serializer):
+    # Plain Serializer (not ModelSerializer): login doesn't create or update a
+    # model, it just validates input and finds the matching user.
+    school_email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        user = CustomUser.objects.filter(
+            school_email__iexact=attrs["school_email"]
+        ).first()
+
+        # Same message for "no such email" and "wrong password", so the
+        # response doesn't reveal which one was wrong.
+        if user is None or not user.check_password(attrs["password"]):
+            raise serializers.ValidationError("Invalid email or password.")
+
+        # Only reached with the correct password, so this message is safe.
+        if not user.is_active:
+            raise serializers.ValidationError(
+                "Please verify your email before logging in."
+            )
+
+        # The view reads the user from serializer.validated_data["user"].
+        attrs["user"] = user
+        return attrs
+
+
+class UserSelfSerializer(serializers.ModelSerializer):
+    """The logged-in user's own account data (includes their email).
+
+    Only for responses about yourself (signup, login, /me). Other users'
+    profiles will get a separate serializer without the email.
+    """
 
     class Meta:
         model = CustomUser
