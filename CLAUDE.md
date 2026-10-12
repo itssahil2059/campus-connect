@@ -17,14 +17,14 @@ wants to attempt things himself first and have mistakes pointed out, rather than
 getting full implementations handed to him by default — ask before writing a large
 chunk of a new feature outright; smaller mechanical fixes are fine to just make.
 
-**Current override: demo push (Oct 4 2026 → prototype demo Mon Oct 5 2026).**
-For this push, write complete code directly (don't wait for Sahil to attempt
-it first), and explain each step in 2–3 sentences he can reuse when presenting.
-After each step: run the tests, fix failures, commit. Still ask before anything
-risky. Scope is one click-through flow only: signup → email verification →
-login → profile + preference questionnaire → home page listing other users'
-profiles. No chat, matching, search, or AWS. Revert to the default mode above
-after the demo unless Sahil says otherwise.
+**Current working mode: fast mode (Sahil's choice, Oct 10 2026 — replaces the
+default above until he says otherwise).** Goal is to finish the core app as
+soon as possible, then add an AI/chatbot feature last before final submission.
+Write complete code directly (don't wait for Sahil to attempt it first), and
+explain each step in 2–3 sentences he can reuse when presenting. After each
+step: run the tests, fix failures, commit, push. Still explain architectural
+choices briefly before coding, and still ask before anything risky (AWS
+resources, new major deps, migrations rewrites, AUTH_USER_MODEL).
 
 ## Team
 - Software Developer: Sahil Bhusal (this repo's primary user)
@@ -47,16 +47,19 @@ after the demo unless Sahil says otherwise.
 ## Stack
 - Backend: Django + Django REST Framework, Python 3.11+
 - DB: PostgreSQL (via docker-compose for local dev; AWS RDS in production)
-- Realtime: Django Channels + Redis (chat) — Redis via docker-compose locally,
-  AWS ElastiCache in production
-- Frontend: React + Vite + TypeScript + Tailwind (not built yet)
+- Realtime: Django Channels + Redis (chat) — Redis via docker-compose locally;
+  in production run Redis on the same EC2 instance (ElastiCache isn't worth the
+  cost on the free plan)
+- Frontend: React + Vite + TypeScript + Tailwind
 - Media: AWS S3 for profile images (via `django-storages` + `boto3`) — swaps
   out the earlier Cloudinary plan; going full AWS to match the course's cloud
   environment
-- Hosting: AWS (EC2 for the backend, RDS for Postgres, ElastiCache for Redis,
-  S3 for media, CloudFront + S3 static hosting for the React frontend, ACM for
-  HTTPS, IAM for permissions). Elastic Beanstalk is an acceptable simpler
-  alternative to raw EC2 if the instructor's class covers it.
+- Hosting: **AWS EC2 (decided Oct 10 2026, not Elastic Beanstalk)**. AWS account
+  is on the 6-month credit-based Free Plan. Plan: one EC2 instance running
+  Nginx (serves the React build + proxies /api and /admin to gunicorn) and
+  Redis; one RDS Postgres; S3 for media later. No domain/HTTPS for the first
+  deploy; add a domain + Let's Encrypt before final submission. Avoid NAT
+  Gateways, load balancers, and ElastiCache (cost).
 - Email: console backend for local dev; AWS SES for real .edu verification
   emails in production
 - Auth: DRF TokenAuthentication (already in settings.py) — not JWT.
@@ -73,8 +76,10 @@ campus-connect/
     core/        Django project (settings, urls, asgi/wsgi)
     users/       Custom user model + auth/verification (signup, verify, login, logout, me)
     profiles/    Profile (bio, interests/likes/dislikes) + questionnaire (Question/Answer)
+  deploy/      EC2 server config (nginx.conf, gittogether.service, setup-server.sh,
+               deploy.sh, env.production.example); guide in docs/deploy.md
   docker-compose.yml   Postgres + Redis for local dev
-  frontend/            Not created yet
+  frontend/            React app
 ```
 
 ## Running it locally
@@ -159,16 +164,12 @@ deploy working after step 1 or 2 so it's not a last-week scramble.
   locally; "Git Together" is the team name, not the product name).
 - Team Leader / Architect / QA roles still unassigned.
 
-## Open instructor questions (waiting on answers)
-- Preferred AWS deployment style — raw EC2 (matches most industry patterns),
-  or Elastic Beanstalk (simpler, class-friendly). Ask if not already covered
-  in lecture.
-
 ## Not yet built
 - Matching app (quiz model + weighted scoring engine)
 - Discovery/search apps
 - Chat app (Channels consumers/routing)
 - Safety app (walk-me-back, trusted-friend check-in)
 - Frontend beyond the demo flow (signup/verify/login/profile setup/home/profile
-  view exist on branch sa4-frontend-flow; landing page "/" is Trinity's tr1-home-page)
-- AWS deployment (EC2/RDS/S3/CloudFront) — not attempted yet
+  view are on dev; landing page "/" is Trinity's PR #5, tr1-home-page)
+- AWS deployment (EC2 + RDS) — production prep in progress on sa5-deploy-prep
+- AI/chatbot feature — deliberately last, right before final submission

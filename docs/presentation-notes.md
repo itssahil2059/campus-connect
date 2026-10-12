@@ -286,6 +286,35 @@ test email, so even the "check your email" step is automated.
 
 ---
 
+## 6. Production prep for AWS EC2 (branch `sa5-deploy-prep`)
+
+**What:** made the app ready to run on a real server, without touching AWS yet.
+- **Safe-by-default settings:** debug is off unless `.env` turns it on; the
+  server refuses to start with the placeholder secret key; every
+  environment-specific value comes from `.env`.
+- **Production web stack:** Nginx serves the built React app and forwards
+  `/api` and `/admin` to **gunicorn**, which runs Django (`runserver` is for
+  development only). The frontend and API share one address, so the browser
+  makes no cross-origin calls and no CORS setup is needed.
+- **Repeatable deploys:** `deploy/setup-server.sh` sets up a fresh Ubuntu
+  server once (packages, Node 22, swap, systemd service, Nginx);
+  `deploy/deploy.sh` updates the live site in one command (pull, migrate,
+  collect static files, build the frontend, restart).
+- **Step-by-step AWS guide** in `docs/deploy.md`: budget alert, EC2, Elastic
+  IP, RDS (private, reachable only from the server), read-only GitHub deploy
+  key, troubleshooting, and teardown.
+
+**How it was tested before spending anything on AWS:** ran gunicorn locally
+with production settings behind the **real Nginx config** (in a Docker
+container), checked every route (React pages, refresh on deep links,
+static files, admin, API 401/404 with no debug-page leak), then clicked the
+full signup → verify → login → profile → home flow in Chrome against it.
+
+**Talking point:** "We rehearsed production locally, so the first real
+deploy only has to deal with AWS itself, not with app configuration."
+
+---
+
 ## Git workflow (worth mentioning — version control is 25% of the grade)
 - Feature branches per task (`sa1-api-docs`, `sa2-auth`), merged into `dev`
   via pull requests. Teammates use the same flow (`setup-cezar`,

@@ -32,7 +32,8 @@ campus-connect/
     profiles/    Profiles + questionnaire (Question/Answer), seed_demo command
     tests_ui/    Selenium browser tests
   frontend/      React app (pages in src/pages, shared UI in src/components)
-  docs/          API list, presentation notes
+  deploy/        EC2 server config: Nginx, gunicorn service, setup + deploy scripts
+  docs/          API list, deployment guide, presentation notes
   docker-compose.yml   Postgres + Redis for local dev
 ```
 
@@ -137,6 +138,15 @@ HEADED=1 pytest tests_ui  # same, but watch Chrome click through
 - The UI tests start their own backend and frontend servers (frontend on
   port **5174**), so you don't need anything running except Docker. Run
   `npm install` in `frontend/` first.
+
+---
+
+## Deployment (AWS)
+
+The live site runs on one **EC2** server (Nginx + gunicorn) with an **RDS**
+Postgres database. Step-by-step guide: [docs/deploy.md](docs/deploy.md).
+Code goes live from the `main` branch: `deploy/deploy.sh` on the server
+pulls, migrates, rebuilds the frontend, and restarts Django.
 
 ---
 
