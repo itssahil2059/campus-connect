@@ -1,15 +1,18 @@
 export default function Footer() {
+  const team = [
+    "Sahil Bhusal",
+    "Christian Martinez",
+    "Cezar Herrera",
+    "Trinity Rodriguez",
+  ];
+
   return (
-    <footer className="bg-white border-t border-slate-200 px-6 py-8">
-      <div className="max-w-6xl mx-auto text-center">
-        <p className="text-sm text-slate-600">
+    <footer className="relative border-t border-line">
+      <div className="mx-auto max-w-5xl px-4 py-8 text-center sm:px-6">
+        <p className="text-sm text-ink">
           (c) 2026 Git-Together - Capstone project
         </p>
-
-        <p className="mt-2 text-sm text-slate-500">
-          Sahil Bhusal · Christian Martinez · Cezar Herrera · Trinity
-          Rodriguez
-        </p>
+        <p className="mt-2 text-sm text-muted">{team.join(" · ")}</p>
       </div>
     </footer>
   );

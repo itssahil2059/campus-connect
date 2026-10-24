@@ -1,177 +1,140 @@
 import { Link } from "react-router-dom";
 import Footer from "../components/Footer";
 
+const steps = [
+  {
+    number: 1,
+    title: "Verify your school email",
+    text: "Sign up with your .edu address so everyone you meet is a real student.",
+  },
+  {
+    number: 2,
+    title: "Answer a short questionnaire",
+    text: "Tell us about your interests and preferences in just a few minutes.",
+  },
+  {
+    number: 3,
+    title: "Discover, connect and chat",
+    text: "Browse compatible students, add friends, and start a conversation.",
+  },
+];
+
+const reasons = [
+  {
+    title: "Verified students only",
+    text: "Every member signs up with a .edu email, so you know who you are talking to.",
+  },
+  {
+    title: "Matches on shared interests, not just photos",
+    text: "Our questionnaire pairs you with people who actually share your interests.",
+  },
+  {
+    title: "Meet students from other colleges",
+    text: "Find friends on your campus and at schools across the country.",
+  },
+];
+
+// Same look as the shared Button in components/ui.tsx, but on Link elements.
+const primaryLink =
+  "inline-flex items-center justify-center rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-cream transition hover:bg-ink/85";
+const outlineLink =
+  "inline-flex items-center justify-center rounded-full border border-ink px-5 py-2.5 text-sm font-medium text-ink transition hover:bg-sand";
+const ghostLink =
+  "inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-medium text-ink transition hover:bg-sand";
+
+// Same card look as the Login page card.
+const card =
+  "rounded-3xl border border-line bg-white/80 p-7 shadow-sm backdrop-blur";
+
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
-      {/* Top Bar */}
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link
-            to="/"
-            className="text-2xl font-bold text-blue-600"
-          >
-            Git-Together
-          </Link>
+    <div className="relative flex min-h-screen flex-col overflow-hidden text-ink">
+      {/* Soft background shapes (same as the Login page) */}
+      <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-accent-soft blur-3xl" />
+      <div className="pointer-events-none absolute -right-16 top-1/2 h-80 w-80 rounded-full bg-amber-100/70 blur-3xl" />
 
-          <div className="flex items-center gap-3">
-            <Link
-              to="/login"
-              className="px-4 py-2 rounded-lg font-medium text-slate-700 hover:bg-slate-100"
-            >
+      {/* 1. Top bar */}
+      <header className="relative border-b border-line">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
+          <Link to="/" className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-accent" />
+            <span className="font-display text-xl font-semibold">
+              Git-Together
+            </span>
+          </Link>
+          <nav className="flex items-center gap-2">
+            <Link to="/login" className={ghostLink}>
               Log in
             </Link>
-
-            <Link
-              to="/signup"
-              className="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
-            >
+            <Link to="/signup" className={primaryLink}>
               Sign up
             </Link>
-          </div>
+          </nav>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <main>
-        <section className="px-6 py-20 sm:py-24 text-center">
-          <div className="max-w-3xl mx-auto">
-            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-slate-800">
-              Meet students who get you.
-            </h1>
-
-            <p className="mt-6 max-w-2xl mx-auto text-lg leading-8 text-slate-600">
-              Git-Together connects verified college students by shared
-              interests, on your campus and beyond.
-            </p>
-
-            <div className="mt-8 flex flex-col sm:flex-row justify-center gap-4">
-              <Link
-                to="/signup"
-                className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white hover:bg-blue-700"
-              >
-                Sign up with your .edu email
-              </Link>
-
-              <Link
-                to="/login"
-                className="rounded-xl border border-blue-600 bg-white px-6 py-3 font-semibold text-blue-600 hover:bg-blue-50"
-              >
-                Log in
-              </Link>
-            </div>
+      <main className="relative flex-1">
+        {/* 2. Hero */}
+        <section className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-24">
+          <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+            Meet students who get you.
+          </h1>
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-muted">
+            Git-Together connects verified college students by shared interests,
+            on your campus and beyond.
+          </p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link to="/signup" className={`${primaryLink} w-full sm:w-auto`}>
+              Sign up with your .edu email
+            </Link>
+            <Link to="/login" className={`${outlineLink} w-full sm:w-auto`}>
+              Log in
+            </Link>
           </div>
         </section>
 
-        {/* How It Works */}
-        <section className="bg-white px-6 py-16">
-          <div className="max-w-6xl mx-auto">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold text-slate-800">
-                How it works
-              </h2>
-
-              <p className="mt-3 text-slate-600">
-                Getting started with Git-Together is simple.
-              </p>
-            </div>
-
-            <div className="mt-10 grid gap-6 md:grid-cols-3">
-              <div className="bg-slate-50 rounded-xl p-6 shadow-sm">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-600 text-white font-bold">
-                  1
+        {/* 3. How it works */}
+        <section className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
+          <h2 className="text-center font-display text-3xl font-semibold">
+            How it works
+          </h2>
+          <div className="mt-8 grid gap-6 md:grid-cols-3">
+            {steps.map((step) => (
+              <div key={step.number} className={card}>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sand font-display font-semibold text-ink">
+                  {step.number}
                 </div>
-
-                <h3 className="mt-5 text-xl font-semibold">
-                  Verify your school email
+                <h3 className="mt-4 font-display text-lg font-semibold">
+                  {step.title}
                 </h3>
-
-                <p className="mt-3 leading-7 text-slate-600">
-                  Use your .edu email to verify that you are a college
-                  student.
-                </p>
+                <p className="mt-2 text-sm text-muted">{step.text}</p>
               </div>
-
-              <div className="bg-slate-50 rounded-xl p-6 shadow-sm">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-600 text-white font-bold">
-                  2
-                </div>
-
-                <h3 className="mt-5 text-xl font-semibold">
-                  Answer a short questionnaire
-                </h3>
-
-                <p className="mt-3 leading-7 text-slate-600">
-                  Share your interests and preferences so Git-Together can
-                  help find compatible students.
-                </p>
-              </div>
-
-              <div className="bg-slate-50 rounded-xl p-6 shadow-sm">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-600 text-white font-bold">
-                  3
-                </div>
-
-                <h3 className="mt-5 text-xl font-semibold">
-                  Discover, connect and chat
-                </h3>
-
-                <p className="mt-3 leading-7 text-slate-600">
-                  Discover students with shared interests, add friends, and
-                  start conversations.
-                </p>
-              </div>
-            </div>
+            ))}
           </div>
         </section>
 
-        {/* Why Git-Together */}
-        <section className="px-6 py-16">
-          <div className="max-w-6xl mx-auto">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold text-slate-800">
-                Why Git-Together
-              </h2>
-            </div>
-
-            <div className="mt-10 grid gap-6 md:grid-cols-3">
-              <div className="bg-white rounded-xl p-6 shadow-sm">
-                <h3 className="text-xl font-semibold">
-                  Verified students only
+        {/* 4. Why Git-Together */}
+        <section className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
+          <h2 className="text-center font-display text-3xl font-semibold">
+            Why Git-Together
+          </h2>
+          <div className="mt-8 grid gap-6 md:grid-cols-3">
+            {reasons.map((reason) => (
+              <div key={reason.title} className={card}>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-soft font-semibold text-accent-dark">
+                  ✓
+                </div>
+                <h3 className="mt-4 font-display text-lg font-semibold">
+                  {reason.title}
                 </h3>
-
-                <p className="mt-3 leading-7 text-slate-600">
-                  College email verification helps keep the community focused
-                  on real college students.
-                </p>
+                <p className="mt-2 text-sm text-muted">{reason.text}</p>
               </div>
-
-              <div className="bg-white rounded-xl p-6 shadow-sm">
-                <h3 className="text-xl font-semibold">
-                  Matches on shared interests, not just photos
-                </h3>
-
-                <p className="mt-3 leading-7 text-slate-600">
-                  Find students based on shared interests and preferences,
-                  rather than appearance alone.
-                </p>
-              </div>
-
-              <div className="bg-white rounded-xl p-6 shadow-sm">
-                <h3 className="text-xl font-semibold">
-                  Meet students from other colleges
-                </h3>
-
-                <p className="mt-3 leading-7 text-slate-600">
-                  Connect with students from your campus and colleges beyond
-                  your own.
-                </p>
-              </div>
-            </div>
+            ))}
           </div>
         </section>
       </main>
 
+      {/* 5. Footer */}
       <Footer />
     </div>
   );
