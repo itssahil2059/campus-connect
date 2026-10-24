@@ -171,5 +171,7 @@ deploy working after step 1 or 2 so it's not a last-week scramble.
 - Safety app (walk-me-back, trusted-friend check-in)
 - Frontend beyond the demo flow (signup/verify/login/profile setup/home/profile
   view are on dev; landing page "/" is Trinity's PR #5, tr1-home-page)
-- AWS deployment (EC2 + RDS) — production prep in progress on sa5-deploy-prep
+- AWS deployment: **live since Oct 24 2026 at http://18.119.39.20** (EC2 + RDS,
+  deployed from `dev` via `deploy/deploy.sh dev`). Still missing: SES for real
+  verification emails, domain + HTTPS. `/` is a frontend placeholder (Trinity's).
 - AI/chatbot feature — deliberately last, right before final submission
