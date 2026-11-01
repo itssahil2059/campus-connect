@@ -315,6 +315,32 @@ deploy only has to deal with AWS itself, not with app configuration."
 
 ---
 
+## 7. Connections (branch `sa7-connections`)
+
+**What:** students send connection requests, accept or decline them, and see
+their connections. Chat (next) is only allowed between connected students.
+New Django app `connections` with one `Connection` model and a DRF viewset.
+
+**Design decisions / talking points:**
+- **One row per pair, enforced by the database.** A Postgres unique
+  constraint on `LEAST(from_user, to_user), GREATEST(from_user, to_user)`
+  makes A→B and B→A the same pair, so duplicate or crossing requests are
+  impossible even if two requests arrive at the same instant.
+- **Mutual requests auto-accept.** If Bob sends a request to Alice while hers
+  to him is pending, they're connected.
+- **Rejections are never revealed.** A declined request keeps looking
+  "pending" to the sender, and they can't re-send it. That stops request spam
+  and spares feelings, which matters on a dating app.
+- **Private by design.** Every query is limited to the logged-in user's own
+  rows. Anyone else gets 404, not 403, so the API doesn't even confirm a
+  connection exists.
+- `are_connected(a, b)` helper: one line for chat to check permission.
+
+**Tests:** 25 new pytest tests (model constraints, every endpoint, privacy,
+decline/resend rules). Full suite: 74 passing.
+
+---
+
 ## Git workflow (worth mentioning — version control is 25% of the grade)
 - Feature branches per task (`sa1-api-docs`, `sa2-auth`), merged into `dev`
   via pull requests. Teammates use the same flow (`setup-cezar`,
