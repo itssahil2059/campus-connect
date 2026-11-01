@@ -95,7 +95,7 @@ Any connection id that isn't yours → `404`.
 | GET | /api/conversations/<id>/ | One chat |
 | GET / POST | /api/conversations/<id>/messages/ | Chat history / send a message |
 | POST | /api/conversations/<id>/read/ | Mark their messages as read |
-| WebSocket | /ws/chat/<id>/ | Live messages (Phase B, not built yet) |
+| WebSocket | /ws/chat/<id>/?token=<token> | Live messages and read receipts |
 
 ### Contract: chat (REST + polling)
 
@@ -160,10 +160,55 @@ other person as read. Call it when the chat is open and new messages arrive.
 
 A conversation id that isn't yours → `404` on all of the above.
 
-**Polling recipe (until the WebSocket ships):**
+**Polling recipe (fallback if the WebSocket can't connect):**
 1. Open `/messages/<id>`: `GET .../messages/`, render, remember `lastId`, then `POST .../read/`.
 2. Every 3 s while the page is visible: `GET .../messages/?after=lastId`.
    Append the results, update `lastId`, and `POST .../read/` if any came from the other person.
 3. On send: `POST .../messages/` and append the returned message (and update
    `lastId`) right away. The next poll won't return it again because its id ≤ `lastId`.
 4. `/messages` list: `GET /api/conversations/` every 10–15 s for unread badges.
+
+### Contract: chat WebSocket (live)
+
+Open one socket per open chat page:
+
+```ts
+const proto = location.protocol === "https:" ? "wss" : "ws";
+// Production: same host as the page. Local dev: the API host (127.0.0.1:8000).
+const ws = new WebSocket(`${proto}://${apiHost}/ws/chat/${conversationId}/?token=${token}`);
+```
+The token goes in the URL because browsers can't set headers on a
+WebSocket. The server keeps these URLs out of its logs.
+
+**Client → server**
+| Send | Effect |
+| --- | --- |
+| `{"type": "message", "body": "hey!"}` | Saves and delivers a message (same rules as `POST .../messages/`) |
+| `{"type": "read"}` | Marks the other person's messages read (same as `POST .../read/`) |
+
+**Server → client**
+| Receive | Meaning |
+| --- | --- |
+| `{"type": "message", "message": message}` | A new message, **including your own** (that's your confirmation, with its real `id`). Same message shape as REST |
+| `{"type": "read", "reader_id": 5, "read_at": "..."}` | Someone read the chat. If `reader_id` isn't you, mark your sent messages "Seen" |
+| `{"type": "error", "detail": "..."}` | Your last message wasn't sent: blank, over 2000 chars, more than 60/min, or no longer connected. Show `detail` |
+
+Messages sent through the REST endpoint are pushed to open sockets too, so
+REST and WebSocket can be mixed.
+
+**Close codes** (`ws.onclose = (e) => e.code`)
+| Code | Meaning | Do |
+| --- | --- | --- |
+| 4401 | Missing/invalid token | Send the user to login |
+| 4403 | Not your chat (or it doesn't exist) | Show "chat not found" |
+| other (1006 etc.) | Network drop / server restart | Reconnect after a few seconds, then `GET .../messages/?after=<lastId>` to catch up on anything missed |
+
+**Recommended page flow**
+1. `GET .../messages/` → render → remember `lastId` → open the socket.
+2. On `message`: append it if `id > lastId` (this skips duplicates), then update `lastId`.
+   If it's from the other person and the tab is visible, send `{"type": "read"}`.
+3. Send with `ws.send(JSON.stringify({type: "message", body}))`. Show the
+   message once it comes back (or show it greyed out until then).
+4. If the socket can't connect, use the polling recipe above instead.
+5. The `/messages` list still uses `GET /api/conversations/` (poll every
+   10–15 s for unread badges). Sockets are per chat only.

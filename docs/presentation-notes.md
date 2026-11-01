@@ -375,6 +375,49 @@ rate limit). Full suite: 99 passing.
 
 ---
 
+## 9. Chat Phase B: real-time WebSockets (branch `sa9-chat-websocket`)
+
+**What:** live chat. Messages and read receipts appear instantly via
+WebSockets, using Django Channels + Redis. `ChatConsumer` at
+`/ws/chat/<id>/`, with token login middleware and the origin check.
+
+**How it works (good diagram for slides):**
+Browser ⇄ WebSocket ⇄ Nginx ⇄ Daphne (ChatConsumer) → saves to Postgres →
+publishes to Redis group `chat_<id>` → every open socket in that chat
+receives it.
+
+**Design decisions / talking points:**
+- **One code path for sending.** REST and WebSocket both call
+  `chat.services.send_message`, so the rules are identical, and a message
+  sent over REST is pushed live to open sockets too.
+- **Token login for WebSockets.** Browsers can't send an Authorization
+  header on a WebSocket, so the DRF token goes in the URL. Nginx and Daphne
+  access logs are switched off for those URLs so tokens never hit log files.
+- **Origin check** (`AllowedHostsOriginValidator`): a malicious site can't
+  open a socket to our server from a logged-in student's browser.
+- **Meaningful close codes** (4401 not logged in, 4403 not your chat). The
+  consumer accepts *then* closes, because closing before accepting hides the
+  code from the browser.
+- **Best-effort broadcast.** The message is saved first. If Redis is down,
+  it's logged and polling still delivers it, so a Redis outage can't lose
+  messages.
+- **Server change:** gunicorn (sync, HTTP only) was replaced by **Daphne**
+  (ASGI: HTTP + WebSockets in one process). Redis runs on the same EC2
+  instance and Nginx got a `/ws/` upgrade block, so there's no extra AWS
+  cost (no ElastiCache, no load balancer).
+- `deploy.sh` now syncs the systemd service and Nginx config automatically,
+  and runs from inside a function so `git pull` can safely update the script
+  while it's running.
+
+**Tests:** 12 new consumer tests run the real ASGI stack (origin check →
+token middleware → routing → consumer) in memory with Channels'
+`WebsocketCommunicator` and an in-memory channel layer (no Redis needed in
+tests). Full suite: 111 passing, plus the 7 Selenium UI tests. Also smoke-tested locally against real
+Redis + Daphne (`101 Switching Protocols` handshake; foreign origin → 403),
+and validated the Nginx config with `nginx -t` in Docker.
+
+---
+
 ## Git workflow (worth mentioning — version control is 25% of the grade)
 - Feature branches per task (`sa1-api-docs`, `sa2-auth`), merged into `dev`
   via pull requests. Teammates use the same flow (`setup-cezar`,

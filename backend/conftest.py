@@ -52,3 +52,11 @@ def make_student(make_user):
         )
 
     return _make_student
+
+
+@pytest.fixture(autouse=True)
+def in_memory_channel_layer(settings):
+    """Chat broadcasts go to an in-process layer, so tests don't need Redis."""
+    settings.CHANNEL_LAYERS = {
+        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+    }
