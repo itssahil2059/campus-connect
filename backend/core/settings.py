@@ -48,6 +48,7 @@ if env_bool('USE_HTTPS'):
 
 # --- Apps ---
 INSTALLED_APPS = [
+    'daphne',  # must be first: runserver becomes ASGI (WebSockets in dev)
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -64,6 +65,8 @@ INSTALLED_APPS = [
     # local apps
     'users',
     'profiles',
+    'connections',
+    'chat',
 ]
 
 AUTH_USER_MODEL = 'users.CustomUser'
@@ -112,16 +115,17 @@ DATABASES = {
     }
 }
 
-# --- Channels (realtime chat; see docker-compose redis service) ---
+# --- Channels (realtime chat) ---
+# The channel layer is how a message saved by one connection reaches every
+# browser in that chat: Daphne publishes to Redis, Redis fans it out.
+# REDIS_URL wins; REDIS_HOST/REDIS_PORT are the older fallback.
+REDIS_URL = os.environ.get('REDIS_URL') or 'redis://{}:{}/0'.format(
+    os.environ.get('REDIS_HOST', 'localhost'), os.environ.get('REDIS_PORT', '6379')
+)
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [(
-                os.environ.get('REDIS_HOST', 'localhost'),
-                int(os.environ.get('REDIS_PORT', 6379)),
-            )],
-        },
+        'CONFIG': {'hosts': [REDIS_URL]},
     },
 }
 
@@ -137,6 +141,11 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    # Per-user limits for views that opt in with throttle_scope. Counts live
+    # in Django's cache (per process), which is fine for one server.
+    'DEFAULT_THROTTLE_RATES': {
+        'chat_send': '60/min',
+    },
 }
 
 # --- Email ---
@@ -194,7 +203,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Print warnings/errors to the console. On the server that's the gunicorn log
+# Print warnings/errors to the console. On the server that's the Daphne log
 # (`journalctl -u gittogether`); with DEBUG off, Django is otherwise silent.
 LOGGING = {
     'version': 1,

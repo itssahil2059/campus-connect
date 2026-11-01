@@ -315,6 +315,109 @@ deploy only has to deal with AWS itself, not with app configuration."
 
 ---
 
+## 7. Connections (branch `sa7-connections`)
+
+**What:** students send connection requests, accept or decline them, and see
+their connections. Chat (next) is only allowed between connected students.
+New Django app `connections` with one `Connection` model and a DRF viewset.
+
+**Design decisions / talking points:**
+- **One row per pair, enforced by the database.** A Postgres unique
+  constraint on `LEAST(from_user, to_user), GREATEST(from_user, to_user)`
+  makes A→B and B→A the same pair, so duplicate or crossing requests are
+  impossible even if two requests arrive at the same instant.
+- **Mutual requests auto-accept.** If Bob sends a request to Alice while hers
+  to him is pending, they're connected.
+- **Rejections are never revealed.** A declined request keeps looking
+  "pending" to the sender, and they can't re-send it. That stops request spam
+  and spares feelings, which matters on a dating app.
+- **Private by design.** Every query is limited to the logged-in user's own
+  rows. Anyone else gets 404, not 403, so the API doesn't even confirm a
+  connection exists.
+- `are_connected(a, b)` helper: one line for chat to check permission.
+
+**Tests:** 25 new pytest tests (model constraints, every endpoint, privacy,
+decline/resend rules). Full suite: 74 passing.
+
+---
+
+## 8. Chat Phase A: REST + polling (branch `sa8-chat-rest`)
+
+**What:** private one-to-one chats between connected students, stored in
+Postgres. New `chat` app with `Conversation` and `Message` models and a DRF
+viewset: chat list with last message and unread count, history, sending, and
+read receipts.
+
+**Design decisions / talking points:**
+- **Ship polling first, real-time second.** The REST API works on today's
+  server with no infrastructure changes. Phase B adds WebSockets on top of the
+  same models, so no work is thrown away.
+- **One row per pair.** The two users are stored in id order with a unique
+  constraint plus a check constraint, so "the chat between Alice and Bob" is
+  one row, guaranteed by the database.
+- **Cursor pagination by message id** (`?after=` for polling, `?before=` for
+  scrolling up). Ids only increase, so one number does both jobs and new
+  messages can't shift pages the way offset pagination would.
+- **Connections gate sending, not reading.** If two students disconnect,
+  history stays but sending is refused (403). That check lives in one
+  service function (`send_message`) that the WebSocket will reuse.
+- **Fixed query count for the chat list:** unread counts and last message ids
+  come from SQL annotations, the last messages load in one bulk query, and
+  connection status is one query, so it's no slower with 100 chats than with 1.
+- **Rate limit:** 60 messages/min per user (DRF throttling) against spam.
+
+**Gotcha found while testing:** the rate-limit test failed at first because DRF reads
+throttle rates once at import time, so overriding settings in a test has no
+effect; the test now patches the throttle class.
+
+**Tests:** 25 new tests (models, service rules, every endpoint, privacy, paging,
+rate limit). Full suite: 99 passing.
+
+---
+
+## 9. Chat Phase B: real-time WebSockets (branch `sa9-chat-websocket`)
+
+**What:** live chat. Messages and read receipts appear instantly via
+WebSockets, using Django Channels + Redis. `ChatConsumer` at
+`/ws/chat/<id>/`, with token login middleware and the origin check.
+
+**How it works (good diagram for slides):**
+Browser ⇄ WebSocket ⇄ Nginx ⇄ Daphne (ChatConsumer) → saves to Postgres →
+publishes to Redis group `chat_<id>` → every open socket in that chat
+receives it.
+
+**Design decisions / talking points:**
+- **One code path for sending.** REST and WebSocket both call
+  `chat.services.send_message`, so the rules are identical, and a message
+  sent over REST is pushed live to open sockets too.
+- **Token login for WebSockets.** Browsers can't send an Authorization
+  header on a WebSocket, so the DRF token goes in the URL. Nginx and Daphne
+  access logs are switched off for those URLs so tokens never hit log files.
+- **Origin check** (`AllowedHostsOriginValidator`): a malicious site can't
+  open a socket to our server from a logged-in student's browser.
+- **Meaningful close codes** (4401 not logged in, 4403 not your chat). The
+  consumer accepts *then* closes, because closing before accepting hides the
+  code from the browser.
+- **Best-effort broadcast.** The message is saved first. If Redis is down,
+  it's logged and polling still delivers it, so a Redis outage can't lose
+  messages.
+- **Server change:** gunicorn (sync, HTTP only) was replaced by **Daphne**
+  (ASGI: HTTP + WebSockets in one process). Redis runs on the same EC2
+  instance and Nginx got a `/ws/` upgrade block, so there's no extra AWS
+  cost (no ElastiCache, no load balancer).
+- `deploy.sh` now syncs the systemd service and Nginx config automatically,
+  and runs from inside a function so `git pull` can safely update the script
+  while it's running.
+
+**Tests:** 12 new consumer tests run the real ASGI stack (origin check →
+token middleware → routing → consumer) in memory with Channels'
+`WebsocketCommunicator` and an in-memory channel layer (no Redis needed in
+tests). Full suite: 111 passing, plus the 7 Selenium UI tests. Also smoke-tested locally against real
+Redis + Daphne (`101 Switching Protocols` handshake; foreign origin → 403),
+and validated the Nginx config with `nginx -t` in Docker.
+
+---
+
 ## Git workflow (worth mentioning — version control is 25% of the grade)
 - Feature branches per task (`sa1-api-docs`, `sa2-auth`), merged into `dev`
   via pull requests. Teammates use the same flow (`setup-cezar`,

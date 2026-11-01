@@ -1,7 +1,5 @@
 import pytest
 from django.urls import reverse
-from rest_framework.authtoken.models import Token
-from rest_framework.test import APIClient
 
 from profiles.models import Answer, Profile, Question
 
@@ -21,18 +19,6 @@ PROFILE_DATA = {
 @pytest.fixture
 def alice(make_user):
     return make_user(is_edu_verified=True)
-
-
-@pytest.fixture
-def client_for():
-    """Returns an API client already logged in as the given user."""
-    def _client_for(user):
-        client = APIClient()
-        token, _ = Token.objects.get_or_create(user=user)
-        client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
-        return client
-
-    return _client_for
 
 
 def detail_url(profile):
@@ -107,6 +93,7 @@ class TestProfileList:
 
         assert response.status_code == 200
         assert response.data["username"] == "bob"
+        assert response.data["user_id"] == bob.id
         assert response.data["interests"] == ["hiking", "coding"]
         assert "school_email" not in response.data
         assert "bob@tamut.edu" not in str(response.data)

@@ -41,6 +41,8 @@ class MyProfileSerializer(serializers.ModelSerializer):
 class PublicProfileSerializer(serializers.ModelSerializer):
     """Another student's profile as shown on Home. Never includes their email."""
 
+    # Needed to send a connection request or open a chat with this student.
+    user_id = serializers.IntegerField(source="user.id")
     username = serializers.CharField(source="user.username")
     college_name = serializers.CharField(source="user.college_name")
     graduation_year = serializers.IntegerField(source="user.graduation_year")
@@ -49,6 +51,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
         model = Profile
         fields = [
             "id",
+            "user_id",
             "username",
             "college_name",
             "graduation_year",

@@ -25,9 +25,9 @@ if [ ! -f /swapfile ]; then
   echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
 fi
 
-echo "==> System packages (Python, Nginx, Postgres client)"
+echo "==> System packages (Python, Nginx, Postgres client, Redis for chat)"
 sudo apt-get update -y
-sudo apt-get install -y python3-venv python3-dev build-essential nginx postgresql-client git curl
+sudo apt-get install -y python3-venv python3-dev build-essential nginx postgresql-client git curl redis-server
 
 echo "==> Node.js 22 (Ubuntu's own Node is too old for Vite)"
 if ! command -v node >/dev/null || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 22 ]; then
@@ -41,14 +41,15 @@ python3 -m venv backend/.venv
 echo "==> Let Nginx read the built frontend and static files in this home folder"
 chmod o+x "$HOME"
 
-echo "==> Install the gunicorn service and the Nginx site"
+echo "==> Install the Daphne service and the Nginx site"
 sudo cp deploy/gittogether.service /etc/systemd/system/gittogether.service
 sudo cp deploy/nginx.conf /etc/nginx/sites-available/gittogether
 sudo ln -sf /etc/nginx/sites-available/gittogether /etc/nginx/sites-enabled/gittogether
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl daemon-reload
-sudo systemctl enable gittogether nginx
+sudo systemctl enable gittogether nginx redis-server
+sudo systemctl start redis-server
 
 echo "==> First deploy"
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
