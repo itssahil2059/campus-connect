@@ -91,6 +91,79 @@ Any connection id that isn't yours → `404`.
 ## Messaging (Week 8)
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | /api/conversations/ | My chats |
-| GET | /api/conversations/<id>/messages/ | Chat history |
-| WebSocket | /ws/chat/<id>/ | Live messages |
+| GET / POST | /api/conversations/ | My chats / open a chat with a connection |
+| GET | /api/conversations/<id>/ | One chat |
+| GET / POST | /api/conversations/<id>/messages/ | Chat history / send a message |
+| POST | /api/conversations/<id>/read/ | Mark their messages as read |
+| WebSocket | /ws/chat/<id>/ | Live messages (Phase B, not built yet) |
+
+### Contract: chat (REST + polling)
+
+You can only start a chat with, or send messages to, an **accepted connection**.
+If two people disconnect, the chat stays in both lists and its history stays
+readable, but `is_connected` becomes `false` and sending returns 403. Disable
+the message box when `is_connected` is false.
+
+**Message:**
+```json
+{
+  "id": 341, "conversation_id": 7, "sender_id": 5, "body": "hey!",
+  "created_at": "2026-11-01T10:00:00-05:00", "read_at": null
+}
+```
+Message ids only go up. Use `id` (not `created_at`) for ordering and as the
+polling cursor. `sender_id === me.id` means "my bubble". `read_at` is set
+when the other person marks the chat read.
+
+**Conversation:**
+```json
+{
+  "id": 7,
+  "other_user": {"id": 5, "username": "bob", "college_name": "TAMUT",
+                 "graduation_year": 2027, "profile_id": 3},
+  "last_message": message | null,
+  "unread_count": 2,
+  "is_connected": true,
+  "updated_at": "2026-11-01T10:00:00-05:00"
+}
+```
+
+**GET /api/conversations/** → `200 [conversation, ...]`, latest activity first.
+Use it for the `/messages` page and unread badges.
+
+**POST /api/conversations/** `{"user_id": 5}` → `201` (new) or `200` (already
+existed) + conversation. Use it for the "Message" button on a profile or
+connection, then navigate to `/messages/<id>`.
+- `403`: not connected (a pending request isn't enough)
+- `400 {"user_id": [...]}`: yourself or no such user
+
+**GET /api/conversations/<id>/** → `200` conversation (chat page header).
+
+**GET /api/conversations/<id>/messages/** → `200 {"results": [message, ...], "has_more": bool}`,
+`results` always **oldest first**, at most 50.
+- no params: the latest 50 (open the chat with this)
+- `?before=<id>`: the 50 before that id (pass your oldest id when scrolling up).
+  `has_more: false` = start of the chat
+- `?after=<id>`: messages newer than that id (**polling**: pass your newest
+  id). `has_more: true` = more than 50 arrived, so call again with the new
+  newest id
+- `400` if `after`/`before` isn't a number
+
+**POST /api/conversations/<id>/messages/** `{"body": "hey!"}` → `201` message.
+- `400 {"body": [...]}`: blank (whitespace only) or over 2000 characters.
+  Leading/trailing spaces are trimmed
+- `403`: no longer connected
+- `429`: more than 60 messages a minute. Show "Slow down" and retry later
+
+**POST /api/conversations/<id>/read/** → `204`. Marks every message from the
+other person as read. Call it when the chat is open and new messages arrive.
+
+A conversation id that isn't yours → `404` on all of the above.
+
+**Polling recipe (until the WebSocket ships):**
+1. Open `/messages/<id>`: `GET .../messages/`, render, remember `lastId`, then `POST .../read/`.
+2. Every 3 s while the page is visible: `GET .../messages/?after=lastId`.
+   Append the results, update `lastId`, and `POST .../read/` if any came from the other person.
+3. On send: `POST .../messages/` and append the returned message (and update
+   `lastId`) right away. The next poll won't return it again because its id ≤ `lastId`.
+4. `/messages` list: `GET /api/conversations/` every 10–15 s for unread badges.

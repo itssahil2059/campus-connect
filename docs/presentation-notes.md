@@ -341,6 +341,40 @@ decline/resend rules). Full suite: 74 passing.
 
 ---
 
+## 8. Chat Phase A: REST + polling (branch `sa8-chat-rest`)
+
+**What:** private one-to-one chats between connected students, stored in
+Postgres. New `chat` app with `Conversation` and `Message` models and a DRF
+viewset: chat list with last message and unread count, history, sending, and
+read receipts.
+
+**Design decisions / talking points:**
+- **Ship polling first, real-time second.** The REST API works on today's
+  server with no infrastructure changes. Phase B adds WebSockets on top of the
+  same models, so no work is thrown away.
+- **One row per pair.** The two users are stored in id order with a unique
+  constraint plus a check constraint, so "the chat between Alice and Bob" is
+  one row, guaranteed by the database.
+- **Cursor pagination by message id** (`?after=` for polling, `?before=` for
+  scrolling up). Ids only increase, so one number does both jobs and new
+  messages can't shift pages the way offset pagination would.
+- **Connections gate sending, not reading.** If two students disconnect,
+  history stays but sending is refused (403). That check lives in one
+  service function (`send_message`) that the WebSocket will reuse.
+- **Fixed query count for the chat list:** unread counts and last message ids
+  come from SQL annotations, the last messages load in one bulk query, and
+  connection status is one query, so it's no slower with 100 chats than with 1.
+- **Rate limit:** 60 messages/min per user (DRF throttling) against spam.
+
+**Gotcha found while testing:** the rate-limit test failed at first because DRF reads
+throttle rates once at import time, so overriding settings in a test has no
+effect; the test now patches the throttle class.
+
+**Tests:** 25 new tests (models, service rules, every endpoint, privacy, paging,
+rate limit). Full suite: 99 passing.
+
+---
+
 ## Git workflow (worth mentioning — version control is 25% of the grade)
 - Feature branches per task (`sa1-api-docs`, `sa2-auth`), merged into `dev`
   via pull requests. Teammates use the same flow (`setup-cezar`,

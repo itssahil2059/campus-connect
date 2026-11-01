@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     'users',
     'profiles',
     'connections',
+    'chat',
 ]
 
 AUTH_USER_MODEL = 'users.CustomUser'
@@ -138,6 +139,11 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    # Per-user limits for views that opt in with throttle_scope. Counts live
+    # in Django's cache (per process), which is fine for one server.
+    'DEFAULT_THROTTLE_RATES': {
+        'chat_send': '60/min',
+    },
 }
 
 # --- Email ---
