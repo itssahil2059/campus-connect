@@ -315,6 +315,23 @@ deploy only has to deal with AWS itself, not with app configuration."
 
 ---
 
+## 7. First live deploy on AWS (Oct 23–24, 2026)
+- **Live at http://18.119.39.20** — EC2 (Ubuntu 24.04) running Nginx +
+  gunicorn (systemd service `gittogether`), database on RDS Postgres.
+- Deployed commit `b977833` from `dev` with one command:
+  `deploy/deploy.sh dev` (pull, install, migrate RDS, collect static, build
+  React, restart). Created the admin user and loaded `seed_demo` (6 profiles).
+- **Tested end-to-end on the live site:** `.edu` signup → verification link →
+  verified → questionnaire → `/home` feed.
+- Rebooted the server for security updates; the app came back on its own
+  (systemd starts it at boot), so it survives restarts without anyone logging in.
+
+**Known gaps (next steps):** verification emails only print to the server log
+(needs AWS SES); HTTP on a bare IP (domain + HTTPS before final submission);
+the `/` route is still a placeholder (frontend, Trinity's landing page PR).
+
+**Talking point:** "Because we rehearsed production locally, the real deploy
+was one script — the only AWS problems left were AWS ones."
 ## 7. Connections (branch `sa7-connections`)
 
 **What:** students send connection requests, accept or decline them, and see
@@ -430,7 +447,7 @@ and validated the Nginx config with `nginx -t` in Docker.
 ---
 
 ## Possible demo script (fill in as features land)
-1. Open http://localhost:5173/signup and try a `@gmail.com` address → error
+1. Open http://18.119.39.20/signup (live) or http://localhost:5173/signup and try a `@gmail.com` address → error
    under the email field.
 2. Sign up with a `.edu` address → "Check your inbox" page.
 3. Copy the link from the Django terminal and open it → "You're verified".
