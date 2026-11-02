@@ -3,9 +3,10 @@
 What we end up with:
 
 ```
-Browser ──http──▶ EC2 (Ubuntu)
-                   ├─ Nginx: serves the React build, forwards /api and /admin
-                   └─ gunicorn: runs Django ──▶ RDS PostgreSQL (private)
+Browser ──http / websocket──▶ EC2 (Ubuntu)
+                   ├─ Nginx: serves the React build, forwards /api, /admin and /ws
+                   ├─ Daphne: runs Django + chat WebSockets ──▶ RDS PostgreSQL (private)
+                   └─ Redis (localhost only): passes live chat messages between connections
 ```
 
 Cost on the 6-month Free Plan: covered by credits (roughly $20–25/month of
@@ -150,6 +151,51 @@ ssh -i ~/.ssh/gittogether-key.pem ubuntu@<ELASTIC_IP>
 ~/campus-connect/deploy/deploy.sh
 ```
 
+## One-time upgrade: real-time chat (server set up before chat existed)
+
+Servers created with an older `setup-server.sh` run gunicorn and have no
+Redis. Chat needs both changed **once**. Do these steps in order, on the server,
+**after the chat PRs are merged into the branch you deploy**:
+
+```bash
+ssh -i ~/.ssh/gittogether-key.pem ubuntu@<ELASTIC_IP>
+cd ~/campus-connect
+
+# 1. Redis: listens on localhost only by default, so no security-group change.
+sudo apt-get update -y && sudo apt-get install -y redis-server
+sudo systemctl enable --now redis-server
+redis-cli ping                       # should print PONG
+
+# 2. Tell Django where Redis is.
+nano backend/.env                    # replace REDIS_HOST/REDIS_PORT with:
+                                     #   REDIS_URL=redis://127.0.0.1:6379/0
+
+# 3. Pull first (the old deploy.sh can trip over being rewritten mid-run),
+#    then deploy. deploy.sh now also copies the new systemd service (Daphne
+#    instead of gunicorn) and the Nginx config with the /ws/ location.
+git fetch origin && git checkout dev && git pull --ff-only origin dev
+deploy/deploy.sh dev
+```
+
+Check it worked:
+
+```bash
+systemctl status gittogether         # "Daphne" in the description, active (running)
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost/api/auth/me/   # 401 = API OK
+# WebSocket handshake through Nginx: first line should be "101 Switching Protocols"
+curl -s -i -N --max-time 2 -H "Connection: Upgrade" -H "Upgrade: websocket" \
+  -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+  -H "Origin: http://<ELASTIC_IP>" http://localhost/ws/chat/1/ | head -1
+```
+
+**Roll back** (if chat breaks the site): `git checkout <previous commit>` in
+`~/campus-connect`, then `sudo cp deploy/gittogether.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart gittogether`
+and the same for `deploy/nginx.conf` → `/etc/nginx/sites-available/gittogether` + `sudo systemctl reload nginx`.
+Redis can stay installed; it's harmless.
+
+Costs: nothing new. Redis runs on the same EC2 instance (no ElastiCache),
+and WebSockets go through the existing Nginx (no load balancer).
+
 ## Handy commands (on the server)
 
 | What | Command |
@@ -157,6 +203,7 @@ ssh -i ~/.ssh/gittogether-key.pem ubuntu@<ELASTIC_IP>
 | Is Django running? | `sudo systemctl status gittogether` |
 | Django logs (incl. verification emails) | `journalctl -u gittogether -f` |
 | Restart Django | `sudo systemctl restart gittogether` |
+| Is Redis running? | `redis-cli ping` (→ `PONG`) |
 | Nginx errors | `sudo tail -f /var/log/nginx/error.log` |
 | Django shell | `cd ~/campus-connect/backend && .venv/bin/python manage.py shell` |
 
@@ -169,6 +216,8 @@ ssh -i ~/.ssh/gittogether-key.pem ubuntu@<ELASTIC_IP>
 | `400 Bad Request` on every page | The IP isn't in `ALLOWED_HOSTS` in `backend/.env` |
 | Admin login says CSRF failed | `CSRF_TRUSTED_ORIGINS` missing `http://<ELASTIC_IP>` |
 | Django log: `could not connect to server` | RDS endpoint/password wrong, or RDS not connected to this EC2 |
+| Chat doesn't update live, but messages appear after a refresh | WebSocket not connecting. Check `redis-cli ping`, that `/ws/` is in the Nginx site (`sudo nginx -T \| grep ws`), and `journalctl -u gittogether -n 50` |
+| WebSocket closes right away with 403 | The page's address isn't in `ALLOWED_HOSTS` (the origin check uses it) |
 | `ssh: Permission denied` | Wrong key file, or `chmod 400` not done, or your IP changed (update the SSH rule to *My IP*) |
 
 ## Stopping costs (end of semester)

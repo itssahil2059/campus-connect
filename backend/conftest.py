@@ -1,4 +1,5 @@
 import pytest
+from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from core.testing import PASSWORD
@@ -25,3 +26,37 @@ def make_user(db):
         )
 
     return _make_user
+
+
+@pytest.fixture
+def client_for(db):
+    """Returns an API client already logged in as the given user."""
+
+    def _client_for(user):
+        client = APIClient()
+        token, _ = Token.objects.get_or_create(user=user)
+        client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+        return client
+
+    return _client_for
+
+
+@pytest.fixture
+def make_student(make_user):
+    """A verified, active student: make_student("bob")."""
+
+    def _make_student(username, **extra):
+        extra.setdefault("is_edu_verified", True)
+        return make_user(
+            username=username, school_email=f"{username}@tamut.edu", **extra
+        )
+
+    return _make_student
+
+
+@pytest.fixture(autouse=True)
+def in_memory_channel_layer(settings):
+    """Chat broadcasts go to an in-process layer, so tests don't need Redis."""
+    settings.CHANNEL_LAYERS = {
+        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+    }
