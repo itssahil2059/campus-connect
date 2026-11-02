@@ -40,14 +40,14 @@ export default function App() {
             <Route path="/profile/setup" element={<ProfileFormPage />} />
             <Route path="/profile/edit" element={<ProfileFormPage />} />
             <Route path="/profile/:id" element={<ProfileViewPage />} />
+            <Route path="/friends" element={<FriendsPage />} />
+            <Route path="/messages" element={<MessagesPage />} />
+            <Route path="/messages/:id" element={<ChatPage />} />
           </Route>
 
           {/* Placeholders for later features. */}
           <Route path="/questionnaire" element={<QuestionnairePage />} />
           <Route path="/discover" element={<DiscoverPage />} />
-          <Route path="/friends" element={<FriendsPage />} />
-          <Route path="/messages" element={<MessagesPage />} />
-          <Route path="/messages/:id" element={<ChatPage />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
