@@ -13,6 +13,20 @@ function convertKeys(data: unknown, fn: (k: string) => string): unknown {
   return data;
 }
 
+/**
+ * WebSocket URL for a path like "/ws/chat/7/". Uses the API host in dev
+ * (VITE_API_URL) or the page's own host in production (VITE_API_URL empty).
+ */
+export function wsUrl(path: string): string {
+  const base = BASE_URL || window.location.origin;
+  return base.replace(/^http/, "ws") + path;
+}
+
+/** Converts a raw WebSocket JSON payload to camelCase like API responses. */
+export function fromServer<T>(data: unknown): T {
+  return convertKeys(data, toCamel) as T;
+}
+
 /** Thrown for any non-2xx response. `data` is the (camelCased) JSON error body. */
 export class ApiError extends Error {
   status: number;
