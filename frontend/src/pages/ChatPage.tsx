@@ -1,519 +1,199 @@
+import { useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { Link, useParams } from "react-router-dom";
+import type { Message } from "../api/types";
+import { useAuth } from "../auth/AuthContext";
+import { useChat, type ChatMode } from "../chat/useChat";
+import { Alert, Avatar, Button, Spinner, shortTime } from "../components/ui";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-} from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { apiGet, apiPost, errorMessage } from "../api/client";
+const MAX_LENGTH = 2000;
 
-type StudentInfo = {
-  id: number | string;
-  name?: string;
-  college?: string;
-};
-
-type Message = {
-  id: number | string;
-  mine: boolean;
-  text: string;
-  sentAt: string;
-};
-
-type ChatLocationState = {
-  student?: StudentInfo;
-};
-
-type ThemeName =
-  | "lavender"
-  | "sage"
-  | "blue"
-  | "peach"
-  | "midnight";
-
-const themes: Record<
-  ThemeName,
-  {
-    name: string;
-    emoji: string;
-    page: string;
-    header: string;
-    card: string;
-    received: string;
-    sent: string;
-    text: string;
-    muted: string;
-    border: string;
-    button: string;
-    input: string;
-    accent: string;
-  }
-> = {
-  lavender: {
-    name: "Lavender Dream",
-    emoji: "✨",
-    page: "bg-[#F7F4FC]",
-    header: "bg-[#E9E4F7]",
-    card: "bg-white",
-    received: "bg-[#F0ECF8]",
-    sent: "bg-[#DCD2F2]",
-    text: "text-[#454052]",
-    muted: "text-[#898196]",
-    border: "border-[#E7E0F1]",
-    button: "bg-[#8975B5] hover:bg-[#76619F]",
-    input: "bg-white",
-    accent: "text-[#8975B5]",
-  },
-  sage: {
-    name: "Sage Garden",
-    emoji: "🌿",
-    page: "bg-[#F4F8F3]",
-    header: "bg-[#E3EEE5]",
-    card: "bg-white",
-    received: "bg-[#EDF4ED]",
-    sent: "bg-[#D5E7D8]",
-    text: "text-[#405347]",
-    muted: "text-[#829286]",
-    border: "border-[#DCE9DE]",
-    button: "bg-[#718D76] hover:bg-[#5E7863]",
-    input: "bg-white",
-    accent: "text-[#718D76]",
-  },
-  blue: {
-    name: "Cloud Blue",
-    emoji: "☁️",
-    page: "bg-[#F3F8FC]",
-    header: "bg-[#E3EFF8]",
-    card: "bg-white",
-    received: "bg-[#EDF4FA]",
-    sent: "bg-[#D6E8F6]",
-    text: "text-[#405366]",
-    muted: "text-[#8295A7]",
-    border: "border-[#DCEAF4]",
-    button: "bg-[#7198B9] hover:bg-[#5D83A4]",
-    input: "bg-white",
-    accent: "text-[#7198B9]",
-  },
-  peach: {
-    name: "Peachy",
-    emoji: "🍑",
-    page: "bg-[#FFF8F2]",
-    header: "bg-[#FFF0DF]",
-    card: "bg-white",
-    received: "bg-[#FFF3E8]",
-    sent: "bg-[#F9E1CB]",
-    text: "text-[#59483E]",
-    muted: "text-[#A18A7B]",
-    border: "border-[#F3E5D8]",
-    button: "bg-[#C58D65] hover:bg-[#AE7750]",
-    input: "bg-white",
-    accent: "text-[#C58D65]",
-  },
-  midnight: {
-    name: "Midnight",
-    emoji: "🌙",
-    page: "bg-[#20212B]",
-    header: "bg-[#30313F]",
-    card: "bg-[#292A36]",
-    received: "bg-[#393A49]",
-    sent: "bg-[#55516F]",
-    text: "text-[#F1EFF8]",
-    muted: "text-[#AAA8BC]",
-    border: "border-[#414252]",
-    button: "bg-[#8176A9] hover:bg-[#716696]",
-    input: "bg-[#353644]",
-    accent: "text-[#B7A9E0]",
-  },
-};
-
-// Each conversation gets its own saved theme.
-const getSavedTheme = (
-  chatId: string | undefined
-): ThemeName => {
-  if (!chatId) return "lavender";
-
-  try {
-    const saved = localStorage.getItem(
-      `git-together-chat-theme-${chatId}`
-    );
-
-    if (saved && saved in themes) {
-      return saved as ThemeName;
-    }
-  } catch {
-    // Use the default theme if storage is unavailable.
-  }
-
-  return "lavender";
-};
-
+/** /messages/:id. The key makes switching chats start from a clean slate. */
 export default function ChatPage() {
-  const { id } = useParams<{ id: string }>();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const { id } = useParams();
+  const { user } = useAuth();
+  if (!user) return null;
+  return <ChatView key={id} conversationId={Number(id)} myId={user.id} />;
+}
 
-  const locationState = location.state as ChatLocationState | null;
-  const student = locationState?.student;
-
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState("");
-
-  const [themeName, setThemeName] = useState<ThemeName>(() =>
-    getSavedTheme(id)
+function ChatView({ conversationId, myId }: { conversationId: number; myId: number }) {
+  const { conversation, messages, hasOlder, mode, error, sendError, loadOlder, send } = useChat(
+    conversationId,
+    myId
   );
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const atBottomRef = useRef(true);
+  const keepOffsetRef = useRef<number | null>(null);
+  const newest = messages.at(-1);
+  const oldestId = messages[0]?.id;
 
-  const theme = themes[themeName];
+  // New message at the bottom: follow it if I'm reading the latest or sent it.
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (el && (atBottomRef.current || newest?.senderId === myId)) el.scrollTop = el.scrollHeight;
+  }, [newest?.id, newest?.senderId, myId]);
 
-  // Load the saved theme whenever the conversation changes.
-  useEffect(() => {
-    setThemeName(getSavedTheme(id));
-  }, [id]);
-
-  // Save the theme for this conversation only.
-  const changeTheme = (nextTheme: ThemeName) => {
-    setThemeName(nextTheme);
-
-    if (!id) return;
-
-    try {
-      localStorage.setItem(
-        `git-together-chat-theme-${id}`,
-        nextTheme
-      );
-    } catch {
-      // The theme still changes for the current session.
+  // Older messages added at the top: keep what I was looking at in place.
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (el && keepOffsetRef.current !== null) {
+      el.scrollTop = el.scrollHeight - keepOffsetRef.current;
+      keepOffsetRef.current = null;
     }
-  };
+  }, [oldestId]);
 
-  const loadMessages = useCallback(async () => {
-    if (!id) return;
+  async function handleLoadOlder() {
+    const el = listRef.current;
+    if (el) keepOffsetRef.current = el.scrollHeight - el.scrollTop;
+    setLoadingOlder(true);
+    await loadOlder();
+    setLoadingOlder(false);
+  }
 
-    try {
-      const response = await apiGet<unknown>(
-        `/api/messages/${id}/`
-      );
-
-      const rawMessages = Array.isArray(response)
-        ? response
-        : [];
-
-      const formattedMessages: Message[] = rawMessages.map(
-        (item: Record<string, unknown>) => ({
-          id: (item.id as number | string) ?? Math.random(),
-          mine: Boolean(item.mine ?? item.fromMe),
-          text: String(item.text ?? item.body ?? ""),
-          sentAt: String(item.sentAt ?? item.createdAt ?? ""),
-        })
-      );
-
-      setMessages(formattedMessages);
-      setError("");
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    setLoading(true);
-    setMessages([]);
-    setError("");
-
-    loadMessages();
-
-    const interval = window.setInterval(() => {
-      loadMessages();
-    }, 5000);
-
-    return () => window.clearInterval(interval);
-  }, [loadMessages]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({
-      behavior: "smooth",
-    });
-  }, [messages]);
-
-  const handleSend = async (
-    event: FormEvent<HTMLFormElement>
-  ) => {
-    event.preventDefault();
-
-    const trimmedMessage = newMessage.trim();
-
-    if (!trimmedMessage || !id || sending) return;
-
-    const temporaryId = `temp-${Date.now()}`;
-
-    const optimisticMessage: Message = {
-      id: temporaryId,
-      mine: true,
-      text: trimmedMessage,
-      sentAt: new Date().toISOString(),
-    };
-
-    setMessages((previous) => [
-      ...previous,
-      optimisticMessage,
-    ]);
-
-    setNewMessage("");
+  async function handleSend(e?: FormEvent) {
+    e?.preventDefault();
+    const body = draft.trim();
+    if (!body || sending) return;
     setSending(true);
-    setError("");
+    if (await send(body)) setDraft("");
+    setSending(false);
+  }
 
-    try {
-      await apiPost(`/api/messages/${id}/`, {
-        text: trimmedMessage,
-      });
-
-      await loadMessages();
-    } catch (err) {
-      setMessages((previous) =>
-        previous.filter(
-          (message) => message.id !== temporaryId
-        )
-      );
-
-      setNewMessage(trimmedMessage);
-      setError(errorMessage(err));
-    } finally {
-      setSending(false);
+  function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    // Enter sends; Shift+Enter adds a new line.
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
     }
-  };
+  }
 
-  const displayName = student?.name || "Your Chat";
+  if (error) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        <BackLink />
+        <Alert>{error}</Alert>
+      </div>
+    );
+  }
+  if (!conversation) {
+    return (
+      <div className="flex justify-center py-20">
+        <Spinner />
+      </div>
+    );
+  }
 
-  const formatTime = (date: string) => {
-    if (!date) return "";
-
-    const parsedDate = new Date(date);
-
-    if (Number.isNaN(parsedDate.getTime())) return "";
-
-    return parsedDate.toLocaleTimeString([], {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  };
+  const other = conversation.otherUser;
+  // "Seen" goes under my latest message once they've read it.
+  const lastMine = [...messages].reverse().find((m) => m.senderId === myId);
 
   return (
-    <div
-      className={`min-h-screen ${theme.page} ${theme.text} transition-colors duration-300`}
-    >
-      <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-3 py-5 sm:px-6">
+    <div className="mx-auto flex h-[calc(100vh-9rem)] max-w-2xl flex-col sm:h-[calc(100vh-11rem)]">
+      <BackLink />
 
-        {/* Header */}
-        <header
-          className={`mb-4 flex flex-wrap items-center justify-between gap-4 rounded-3xl ${theme.header} p-4 shadow-sm`}
-        >
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => navigate("/messages")}
-              className={`rounded-full ${theme.card} ${theme.text} px-3 py-2 text-sm shadow-sm transition hover:scale-105`}
-            >
-              ← Back
-            </button>
-
-            <div>
-              <h1 className="text-xl font-bold sm:text-2xl">
-                {displayName}
-              </h1>
-
-              <p className={`text-sm ${theme.muted}`}>
-                {student?.college || "Your conversations"} · Chat together
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => navigate("/messages")}
-            className={`rounded-full ${theme.card} ${theme.text} px-4 py-2 text-sm font-semibold shadow-sm transition hover:scale-105`}
-          >
-            All Messages
-          </button>
-        </header>
-
-        {/* Theme selector */}
-        <section
-          className={`mb-4 rounded-3xl ${theme.card} border ${theme.border} p-4 shadow-sm`}
-        >
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <h2 className="font-bold">
-                Make this chat yours ✨
-              </h2>
-
-              <p className={`text-xs ${theme.muted}`}>
-                Choose a theme for this conversation.
-              </p>
-            </div>
-
-            <span className="text-xl">🎨</span>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {(Object.keys(themes) as ThemeName[]).map(
-              (key) => {
-                const option = themes[key];
-                const selected = themeName === key;
-
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => changeTheme(key)}
-                    aria-pressed={selected}
-                    className={`rounded-full border px-3 py-2 text-xs font-semibold transition hover:scale-105 ${
-                      selected
-                        ? `${theme.button} border-transparent text-white shadow-sm`
-                        : `${theme.page} ${theme.text} ${theme.border}`
-                    }`}
-                  >
-                    {option.emoji} {option.name}
-                    {selected && " ✓"}
-                  </button>
-                );
-              }
-            )}
-          </div>
-        </section>
-
-        {/* Chat window */}
-        <main
-          className={`flex min-h-[480px] flex-1 flex-col overflow-hidden rounded-3xl border ${theme.border} ${theme.card} shadow-sm`}
-        >
-          <div
-            className={`flex items-center justify-between border-b ${theme.border} px-5 py-4`}
-          >
-            <div>
-              <h2 className="font-bold">
-                Your Conversation
-              </h2>
-
-              <p className={`text-xs ${theme.muted}`}>
-                A little space to catch up 💬
-              </p>
-            </div>
-
-            <span className="text-2xl">✦</span>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
-            {loading && (
-              <div className={`py-12 text-center ${theme.muted}`}>
-                <div className="mb-3 animate-pulse text-3xl">
-                  💬
-                </div>
-                Loading your conversation...
-              </div>
-            )}
-
-            {!loading && messages.length === 0 && (
-              <div className="flex min-h-[300px] flex-col items-center justify-center text-center">
-                <div className="mb-4 text-6xl">☁️</div>
-
-                <h3 className="text-lg font-bold">
-                  It's a little quiet here!
-                </h3>
-
-                <p className={`mt-2 max-w-xs text-sm ${theme.muted}`}>
-                  Send the first message and start getting to know each
-                  other.
-                </p>
-
-                <span className="mt-4 text-2xl">✧</span>
-              </div>
-            )}
-
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${
-                  message.mine ? "justify-end" : "justify-start"
-                }`}
-              >
-                <div className="max-w-[85%] sm:max-w-[70%]">
-                  <div
-                    className={`rounded-3xl px-4 py-3 shadow-sm ${
-                      message.mine
-                        ? `${theme.sent} rounded-br-md`
-                        : `${theme.received} rounded-bl-md`
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-                      {message.text}
-                    </p>
-                  </div>
-
-                  <p
-                    className={`mt-1 px-2 text-[10px] ${theme.muted} ${
-                      message.mine ? "text-right" : "text-left"
-                    }`}
-                  >
-                    {message.mine ? "You" : displayName}
-                    {message.sentAt
-                      ? ` · ${formatTime(message.sentAt)}`
-                      : ""}
-                  </p>
-                </div>
-              </div>
-            ))}
-
-            <div ref={bottomRef} />
-          </div>
-
-          {/* Error message */}
-          {error && (
-            <div className="mx-4 mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
-            </div>
+      <header className="mt-3 flex items-center gap-3 rounded-t-3xl border border-line bg-white px-4 py-3">
+        <Avatar name={other.username} />
+        <div className="min-w-0 flex-1">
+          {other.profileId ? (
+            <Link to={`/profile/${other.profileId}`} className="font-semibold hover:text-accent-dark">
+              {other.username}
+            </Link>
+          ) : (
+            <p className="font-semibold">{other.username}</p>
           )}
+          <p className="truncate text-xs text-muted">{other.collegeName}</p>
+        </div>
+        <ModeBadge mode={mode} />
+      </header>
 
-          {/* Message input */}
-          <form
-            onSubmit={handleSend}
-            className={`border-t ${theme.border} p-4`}
-          >
-            <div
-              className={`flex items-center gap-2 rounded-full border ${theme.border} ${theme.input} p-2`}
-            >
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(event) =>
-                  setNewMessage(event.target.value)
-                }
-                placeholder="Write something nice..."
-                className={`min-w-0 flex-1 bg-transparent px-3 py-2 text-sm outline-none ${theme.text}`}
-                disabled={sending}
-              />
-
-              <button
-                type="submit"
-                disabled={!newMessage.trim() || sending}
-                className={`rounded-full ${theme.button} px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50`}
-              >
-                {sending ? "Sending..." : "Send ✨"}
-              </button>
-            </div>
-
-            <p className={`mt-2 text-center text-xs ${theme.muted}`}>
-              Be kind, be yourself, and enjoy the conversation ♡
-            </p>
-          </form>
-        </main>
+      <div
+        ref={listRef}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        }}
+        data-testid="message-list"
+        className="flex-1 space-y-2 overflow-y-auto border-x border-line bg-cream/40 px-4 py-4"
+      >
+        {hasOlder && (
+          <div className="flex justify-center pb-2">
+            <Button variant="ghost" onClick={handleLoadOlder} loading={loadingOlder}>
+              Load older messages
+            </Button>
+          </div>
+        )}
+        {messages.length === 0 && (
+          <p className="py-16 text-center text-sm text-muted">No messages yet. Say hi to {other.username}!</p>
+        )}
+        {messages.map((m) => (
+          <Bubble key={m.id} message={m} mine={m.senderId === myId} seen={m === lastMine && !!m.readAt} />
+        ))}
       </div>
+
+      <form onSubmit={handleSend} className="rounded-b-3xl border border-line bg-white p-3">
+        {sendError && <p className="mb-2 px-1 text-sm text-accent-dark" role="alert">{sendError}</p>}
+        {conversation.isConnected ? (
+          <div className="flex items-end gap-2">
+            <textarea
+              name="message"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={handleKeyDown}
+              maxLength={MAX_LENGTH}
+              rows={1}
+              placeholder={`Message ${other.username}…`}
+              className="max-h-32 min-h-[2.75rem] flex-1 resize-none rounded-2xl border border-line px-4 py-2.5 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
+            />
+            <Button type="submit" loading={sending} disabled={!draft.trim()}>
+              Send
+            </Button>
+          </div>
+        ) : (
+          <p className="px-1 py-2 text-center text-sm text-muted">
+            You're no longer connected with {other.username}, so you can't send new messages.
+          </p>
+        )}
+      </form>
     </div>
+  );
+}
+
+function Bubble({ message, mine, seen }: { message: Message; mine: boolean; seen: boolean }) {
+  return (
+    <div className={`flex flex-col ${mine ? "items-end" : "items-start"}`} data-testid="message">
+      <div
+        className={`max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2 text-sm ${
+          mine ? "rounded-br-md bg-ink text-cream" : "rounded-bl-md border border-line bg-white"
+        }`}
+      >
+        {message.body}
+      </div>
+      <span className="mt-0.5 px-1 text-[11px] text-muted">
+        {shortTime(message.createdAt)}
+        {seen && " · Seen"}
+      </span>
+    </div>
+  );
+}
+
+function ModeBadge({ mode }: { mode: ChatMode }) {
+  const label = { live: "Live", polling: "Reconnecting…", connecting: "Connecting…" }[mode];
+  const dot = mode === "live" ? "bg-emerald-500" : "bg-amber-400";
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-muted" data-testid="chat-mode" data-mode={mode}>
+      <span className={`h-2 w-2 rounded-full ${dot}`} />
+      {label}
+    </span>
+  );
+}
+
+function BackLink() {
+  return (
+    <Link to="/messages" className="text-sm text-muted hover:text-ink">
+      ← All messages
+    </Link>
   );
 }

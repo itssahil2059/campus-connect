@@ -435,6 +435,41 @@ and validated the Nginx config with `nginx -t` in Docker.
 
 ---
 
+## 10. Frontend: Friends, Messages, live Chat (branch `sa10-frontend-social`)
+
+**What:** the React pages for connections and chat.
+- **Profile page:** Connect button that follows the state: Connect →
+  Requested (cancel) → Accept/Decline → Message / Remove.
+- **Friends** (`/friends`): Connections and Requests tabs (waiting for you /
+  sent by you), with a red badge for new requests.
+- **Messages** (`/messages`): chat list with last message, time, and unread
+  badges, refreshing every 15 s.
+- **Chat** (`/messages/:id`): bubbles, "Load older messages", Enter to send,
+  a **Live** indicator, a **"Seen"** receipt, and a read-only notice after
+  disconnecting.
+
+**Design decisions / talking points:**
+- **All real-time logic lives in one hook** (`useChat`): WebSocket, reconnect
+  with backoff (2 s → 30 s), catch-up after reconnecting, read receipts. The
+  page component only does layout.
+- **Graceful fallback:** if the WebSocket can't connect, the chat quietly
+  switches to polling every 3 s and keeps retrying the socket. The badge
+  shows "Reconnecting…", so chat never just stops working.
+- **No duplicate messages:** messages are merged by id, so the same message
+  arriving over both the socket and a catch-up request shows once.
+- **Phone-friendly:** checked at 375 px (iPhone width) with no sideways
+  scrolling. On phones the logo doubles as the Home link to fit the nav.
+
+**Verified:**
+- 3 new Selenium tests (connect → accept → message; send/receive with unread
+  badge and read marking; read-only chat after disconnect). They run against
+  pytest's plain HTTP test server, so they also prove the polling fallback works.
+- Manual two-browser check against the real ASGI server: both windows
+  "Live", message delivered in **0.14 s**, "Seen" receipt shown.
+- Full suite: 111 unit/API + 10 UI tests passing; lint and production build clean.
+
+---
+
 ## Git workflow (worth mentioning — version control is 25% of the grade)
 - Feature branches per task (`sa1-api-docs`, `sa2-auth`), merged into `dev`
   via pull requests. Teammates use the same flow (`setup-cezar`,

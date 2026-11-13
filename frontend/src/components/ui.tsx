@@ -116,3 +116,17 @@ export function Avatar({ name, size = "md" }: { name: string; size?: "md" | "lg"
 export function classYear(year: number | null) {
   return year ? `Class of ${year}` : null;
 }
+
+/** Short time for chat lists/bubbles: "3:05 PM" today, "Mon" this week, else "Oct 12". */
+export function shortTime(iso: string) {
+  const date = new Date(iso);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+  const sixDays = 6 * 24 * 60 * 60 * 1000;
+  if (now.getTime() - date.getTime() < sixDays) {
+    return date.toLocaleDateString([], { weekday: "short" });
+  }
+  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
