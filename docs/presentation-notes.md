@@ -470,6 +470,28 @@ and validated the Nginx config with `nginx -t` in Docker.
 
 ---
 
+## 11. Merging a teammate's PR: Discover page (PR #15, `tr2-discover-messages`)
+- **What happened:** Trinity built Discover, Chat and Messages pages while I
+  was building Chat and Messages too. My PR merged first, so her PR had merge
+  conflicts in the two files we both rewrote.
+- **How I resolved it:** merged `dev` *into her branch* (not a rebase), so her
+  commit stays in the history under her name and no force-push was needed.
+  For Chat and Messages I kept the `dev` versions, because they use the real
+  `/api/conversations/` endpoints and the live WebSocket; hers called
+  `/api/messages/`, which doesn't exist. Her Discover page was kept.
+- **Integration fixes on Discover:** Add friend now calls `/api/connections/`
+  with the **user id** (it was sending the profile id to a non-existent URL);
+  Message now creates/opens the conversation first, then goes to
+  `/messages/<conversation id>`; the Friends tab loads real connections from
+  the server, so friends survive a refresh.
+- **Test:** new Selenium test `test_discover_add_friend_then_message`. I
+  checked that it fails on the old page and passes on the fixed one.
+- **Talking point:** a merge conflict is Git saying "two people changed the
+  same lines; a human has to choose." The lesson: pull `dev` before you start
+  a branch, and again before opening a PR.
+
+---
+
 ## Git workflow (worth mentioning — version control is 25% of the grade)
 - Feature branches per task (`sa1-api-docs`, `sa2-auth`), merged into `dev`
   via pull requests. Teammates use the same flow (`setup-cezar`,

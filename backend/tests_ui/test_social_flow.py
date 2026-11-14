@@ -109,3 +109,27 @@ def test_chat_after_disconnect_is_read_only(page, wait, alice, bob):
 
     wait.until(EC.text_to_be_present_in_element((By.TAG_NAME, "form"), "no longer connected"))
     assert not page.find_elements(By.NAME, "message")
+
+
+def test_discover_add_friend_then_message(page, wait, alice, bob):
+    # Alice finds Bob under Discover > Everyone and adds him.
+    log_in_as(page, alice, "/discover")
+    click_button(wait, "Everyone")
+    click_button(wait, "Add friend")
+    wait.until(EC.visibility_of_element_located((By.XPATH, "//button[normalize-space()='Request sent']")))
+    connection = Connection.objects.get()
+    assert (connection.from_user, connection.to_user) == (alice, bob)
+
+    # Bob accepts (his side is covered above). After a reload, Bob is still
+    # under Alice's Friends tab, so friends come from the server, not memory.
+    connection.status = Connection.Status.ACCEPTED
+    connection.save()
+    page.refresh()
+    click_button(wait, "Friends")
+    card = wait.until(EC.visibility_of_element_located((By.XPATH, "//article[contains(., 'bob')]")))
+
+    # Message opens a real chat with Bob.
+    card.find_element(By.XPATH, ".//button[normalize-space()='Message']").click()
+    wait.until(EC.url_matches(r"/messages/\d+$"))
+    chat = Conversation.objects.get()
+    assert page.current_url.endswith(f"/messages/{chat.id}")
