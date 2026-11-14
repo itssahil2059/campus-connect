@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { apiDelete, apiGet, apiPost, errorMessage } from "../api/client";
-import type { Connection, Conversation, MyProfile, PublicProfile } from "../api/types";
+import { apiGet, errorMessage } from "../api/client";
+import type { Connection, MyProfile, PublicProfile } from "../api/types";
+import ConnectButton from "../components/ConnectButton";
 import {
   Alert,
   Avatar,
@@ -137,19 +138,9 @@ async function fetchDiscoverData(): Promise<{
 function StudentCard({
   student,
   myInterests,
-  isFriend,
-  requested,
-  onAdd,
-  onMessage,
-  onRemove,
 }: {
   student: Student;
   myInterests: string[];
-  isFriend: boolean;
-  requested: boolean;
-  onAdd: () => void;
-  onMessage: () => void;
-  onRemove?: () => void;
 }) {
   const mine = myInterests.map((i) => i.toLowerCase());
   const extra = student.interests.length - MAX_CHIPS;
@@ -203,37 +194,17 @@ function StudentCard({
         </div>
       )}
 
-      <div className="mt-auto flex flex-col gap-2 pt-5">
-        {isFriend ? (
-          <>
-            <Button
-              type="button"
-              onClick={onMessage}
-              className="w-full"
-            >
-              Message
+      <div className="mt-auto flex flex-col gap-3 pt-5">
+        {/* Connect, Requested, Accept/Decline, Message and Remove all live here. */}
+        <div className="flex justify-center">
+          {USE_SAMPLE_DATA ? (
+            <Button type="button" disabled>
+              Connect (sample data)
             </Button>
-
-            {onRemove && (
-              <button
-                type="button"
-                onClick={onRemove}
-                className="w-full rounded-full border border-red-200 px-5 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
-              >
-                Remove Friend
-              </button>
-            )}
-          </>
-        ) : (
-          <Button
-            type="button"
-            onClick={onAdd}
-            disabled={requested}
-            className="w-full"
-          >
-            {requested ? "Request sent" : "Add friend"}
-          </Button>
-        )}
+          ) : (
+            <ConnectButton userId={student.userId} />
+          )}
+        </div>
 
         <Link
           to={`/profile/${student.id}`}
@@ -257,13 +228,12 @@ export default function DiscoverPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [myInterests, setMyInterests] = useState<string[]>([]);
 
-  // My connections, keyed by the other student's user id. Loaded from the
-  // server so friends and sent requests survive a page refresh.
+  // My connections, keyed by the other student's user id. Used for the
+  // Friends tab. ConnectButton loads and updates its own state per card.
   const [connections, setConnections] = useState<Record<number, Connection>>({});
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [actionError, setActionError] = useState("");
 
   const [search, setSearch] = useState("");
   const [college, setCollege] = useState("All");
@@ -273,6 +243,7 @@ export default function DiscoverPage() {
   const loadData = useCallback(() => {
     fetchDiscoverData()
       .then((data) => {
+        setError("");
         setMyInterests(data.myInterests);
         setStudents(data.students);
         setConnections(data.connections);
@@ -285,86 +256,21 @@ export default function DiscoverPage() {
     loadData();
   }, [loadData]);
 
-  // loading starts true, so only Retry needs to reset it.
+  // Opening the Friends tab refreshes it, so someone you just connected
+  // with from a card shows up there.
+  useEffect(() => {
+    if (tab === "friends") loadData();
+  }, [tab, loadData]);
+
+  // loading starts true, so only Refresh needs to reset it.
   function retry() {
     setLoading(true);
     setError("");
     loadData();
   }
 
-  function isFriend(userId: number) {
-    return connections[userId]?.status === "connected";
-  }
-
-  function isRequested(userId: number) {
-    return connections[userId]?.status === "outgoing";
-  }
-
-  function forget(userId: number) {
-    setConnections((current) => {
-      const next = { ...current };
-      delete next[userId];
-      return next;
-    });
-  }
-
-  async function handleRemoveFriend(student: Student) {
-    const connection = connections[student.userId];
-    if (!connection) return;
-
-    const confirmed = window.confirm(
-      `Are you sure you want to remove ${student.name} from your friends list?`
-    );
-
-    if (!confirmed) return;
-
-    setActionError("");
-
-    try {
-      await apiDelete(`/api/connections/${connection.id}/`);
-      forget(student.userId);
-    } catch (err) {
-      setActionError(errorMessage(err));
-    }
-  }
-
-  async function handleAddFriend(student: Student) {
-    if (connections[student.userId]) return;
-
-    setActionError("");
-
-    try {
-      // Sends a request, or accepts theirs if they already asked you.
-      const connection = await apiPost<Connection>("/api/connections/", {
-        userId: student.userId,
-      });
-
-      setConnections((current) => ({
-        ...current,
-        [student.userId]: connection,
-      }));
-    } catch (err) {
-      setActionError(errorMessage(err));
-    }
-  }
-
-  async function openChat(student: Student) {
-    setActionError("");
-
-    try {
-      // Finds the existing chat with this friend, or starts one.
-      const chat = await apiPost<Conversation>("/api/conversations/", {
-        userId: student.userId,
-      });
-
-      navigate(`/messages/${chat.id}`);
-    } catch (err) {
-      setActionError(errorMessage(err));
-    }
-  }
-
-  const friends = students.filter((student) =>
-    isFriend(student.userId)
+  const friends = students.filter(
+    (student) => connections[student.userId]?.status === "connected"
   );
 
   const colleges = useMemo(
@@ -420,22 +326,11 @@ export default function DiscoverPage() {
   );
 
   function renderCard(student: Student) {
-    const friend = isFriend(student.userId);
-
     return (
       <StudentCard
         key={student.id}
         student={student}
         myInterests={myInterests}
-        isFriend={friend}
-        requested={isRequested(student.userId)}
-        onAdd={() => handleAddFriend(student)}
-        onMessage={() => openChat(student)}
-        onRemove={
-          friend
-            ? () => handleRemoveFriend(student)
-            : undefined
-        }
       />
     );
   }
@@ -525,12 +420,6 @@ export default function DiscoverPage() {
             Refresh
           </Button>
         </div>
-
-        {actionError && (
-          <div className="mt-4">
-            <Alert>{actionError}</Alert>
-          </div>
-        )}
 
         {error && (
           <div className="mt-4">
