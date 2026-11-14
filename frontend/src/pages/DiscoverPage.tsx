@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { apiGet, apiPost, errorMessage } from "../api/client";
-import type { MyProfile, PublicProfile } from "../api/types";
+import { apiDelete, apiGet, apiPost, errorMessage } from "../api/client";
+import type { Connection, Conversation, MyProfile, PublicProfile } from "../api/types";
 import {
   Alert,
   Avatar,
@@ -19,7 +19,10 @@ type Tab = "discover" | "friends";
 type Sub = "suggested" | "everyone" | "search";
 
 type Student = {
+  /** Profile id: used for the /profile/:id link. */
   id: number;
+  /** User id: the connections and chat APIs need this one, not the profile id. */
+  userId: number;
   name: string;
   college: string;
   classLabel: string | null;
@@ -31,6 +34,7 @@ type Student = {
 const sampleStudents: Student[] = [
   {
     id: 1,
+    userId: 1,
     name: "maya_patel",
     college: "Texas A&M University",
     classLabel: "Class of 2027",
@@ -40,6 +44,7 @@ const sampleStudents: Student[] = [
   },
   {
     id: 2,
+    userId: 2,
     name: "jordan_lee",
     college: "University of Texas at Austin",
     classLabel: "Class of 2028",
@@ -49,6 +54,7 @@ const sampleStudents: Student[] = [
   },
   {
     id: 3,
+    userId: 3,
     name: "sofia_r",
     college: "Rice University",
     classLabel: "Class of 2026",
@@ -57,8 +63,6 @@ const sampleStudents: Student[] = [
     match: 50,
   },
 ];
-
-const SAMPLE_FRIEND_IDS = [1, 3];
 
 const OTHER_PAGES = [
   { label: "Feed", to: "/home" },
@@ -81,6 +85,7 @@ function fromProfile(p: PublicProfile, mine: string[]): Student {
 
   return {
     id: p.id,
+    userId: p.userId,
     name: p.username,
     college: p.collegeName ?? "",
     classLabel: p.graduationYear
@@ -89,6 +94,41 @@ function fromProfile(p: PublicProfile, mine: string[]): Student {
     bio: p.bio ?? "",
     interests,
     match: calcMatch(mine, interests),
+  };
+}
+
+/** Everything the page needs: students, my interests, my connections. */
+async function fetchDiscoverData(): Promise<{
+  students: Student[];
+  myInterests: string[];
+  connections: Record<number, Connection>;
+}> {
+  if (USE_SAMPLE_DATA) {
+    const mine = ["Coding", "Hiking", "Music", "Board games"];
+
+    return {
+      myInterests: mine,
+      students: sampleStudents.map((student) => ({
+        ...student,
+        match: calcMatch(mine, student.interests),
+      })),
+      connections: {},
+    };
+  }
+
+  const [profiles, me, myConnections] = await Promise.all([
+    apiGet<PublicProfile[]>("/api/profiles/"),
+    apiGet<MyProfile>("/api/profiles/me/"),
+    apiGet<Connection[]>("/api/connections/"),
+  ]);
+
+  const mine = me.interests ?? [];
+
+  return {
+    myInterests: mine,
+    students: profiles.map((profile) => fromProfile(profile, mine)),
+    // Keyed by the other student's user id.
+    connections: Object.fromEntries(myConnections.map((c) => [c.user.id, c])),
   };
 }
 
@@ -217,12 +257,9 @@ export default function DiscoverPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [myInterests, setMyInterests] = useState<string[]>([]);
 
-  const [friendIds, setFriendIds] = useState<number[]>(
-    USE_SAMPLE_DATA ? SAMPLE_FRIEND_IDS : []
-  );
-
-  const [sentRequests, setSentRequests] = useState<number[]>([]);
-  const [removedFriendIds, setRemovedFriendIds] = useState<number[]>([]);
+  // My connections, keyed by the other student's user id. Loaded from the
+  // server so friends and sent requests survive a page refresh.
+  const [connections, setConnections] = useState<Record<number, Connection>>({});
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -231,109 +268,103 @@ export default function DiscoverPage() {
   const [search, setSearch] = useState("");
   const [college, setCollege] = useState("All");
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      if (USE_SAMPLE_DATA) {
-        const mine = ["Coding", "Hiking", "Music", "Board games"];
-
-        setMyInterests(mine);
-
-        setStudents(
-          sampleStudents.map((student) => ({
-            ...student,
-            match: calcMatch(mine, student.interests),
-          }))
-        );
-
-        setFriendIds(SAMPLE_FRIEND_IDS);
-      } else {
-        const [profiles, me] = await Promise.all([
-          apiGet<PublicProfile[]>("/api/profiles/"),
-          apiGet<MyProfile>("/api/profiles/me/"),
-        ]);
-
-        const mine = me.interests ?? [];
-
-        setMyInterests(mine);
-        setStudents(profiles.map((profile) => fromProfile(profile, mine)));
-      }
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setLoading(false);
-    }
+  // Fetch first, then set state in .then(), so the effect never sets
+  // state synchronously (what the react-hooks lint rule checks for).
+  const loadData = useCallback(() => {
+    fetchDiscoverData()
+      .then((data) => {
+        setMyInterests(data.myInterests);
+        setStudents(data.students);
+        setConnections(data.connections);
+      })
+      .catch((err) => setError(errorMessage(err)))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  function isFriend(id: number) {
-    return (
-      !removedFriendIds.includes(id) &&
-      friendIds.includes(id)
-    );
+  // loading starts true, so only Retry needs to reset it.
+  function retry() {
+    setLoading(true);
+    setError("");
+    loadData();
   }
 
-  function handleRemoveFriend(id: number) {
-    const student = students.find((s) => s.id === id);
+  function isFriend(userId: number) {
+    return connections[userId]?.status === "connected";
+  }
+
+  function isRequested(userId: number) {
+    return connections[userId]?.status === "outgoing";
+  }
+
+  function forget(userId: number) {
+    setConnections((current) => {
+      const next = { ...current };
+      delete next[userId];
+      return next;
+    });
+  }
+
+  async function handleRemoveFriend(student: Student) {
+    const connection = connections[student.userId];
+    if (!connection) return;
 
     const confirmed = window.confirm(
-      `Are you sure you want to remove ${
-        student?.name ?? "this friend"
-      } from your friends list?`
+      `Are you sure you want to remove ${student.name} from your friends list?`
     );
 
     if (!confirmed) return;
 
-    setRemovedFriendIds((current) =>
-      current.includes(id) ? current : [...current, id]
-    );
-
-    setFriendIds((current) =>
-      current.filter((friendId) => friendId !== id)
-    );
-
-    setSentRequests((current) =>
-      current.filter((friendId) => friendId !== id)
-    );
-  }
-
-  async function handleAddFriend(id: number) {
-    if (sentRequests.includes(id)) return;
-
     setActionError("");
 
     try {
-      await apiPost("/api/friends/requests/", {
-        toUserId: id,
-      });
-
-      setSentRequests((current) =>
-        current.includes(id) ? current : [...current, id]
-      );
+      await apiDelete(`/api/connections/${connection.id}/`);
+      forget(student.userId);
     } catch (err) {
       setActionError(errorMessage(err));
     }
   }
 
-  function openChat(student: Student) {
-    navigate(`/messages/${student.id}`, {
-      state: {
-        student: {
-          id: student.id,
-          name: student.name,
-          college: student.college,
-        },
-      },
-    });
+  async function handleAddFriend(student: Student) {
+    if (connections[student.userId]) return;
+
+    setActionError("");
+
+    try {
+      // Sends a request, or accepts theirs if they already asked you.
+      const connection = await apiPost<Connection>("/api/connections/", {
+        userId: student.userId,
+      });
+
+      setConnections((current) => ({
+        ...current,
+        [student.userId]: connection,
+      }));
+    } catch (err) {
+      setActionError(errorMessage(err));
+    }
+  }
+
+  async function openChat(student: Student) {
+    setActionError("");
+
+    try {
+      // Finds the existing chat with this friend, or starts one.
+      const chat = await apiPost<Conversation>("/api/conversations/", {
+        userId: student.userId,
+      });
+
+      navigate(`/messages/${chat.id}`);
+    } catch (err) {
+      setActionError(errorMessage(err));
+    }
   }
 
   const friends = students.filter((student) =>
-    isFriend(student.id)
+    isFriend(student.userId)
   );
 
   const colleges = useMemo(
@@ -389,7 +420,7 @@ export default function DiscoverPage() {
   );
 
   function renderCard(student: Student) {
-    const friend = isFriend(student.id);
+    const friend = isFriend(student.userId);
 
     return (
       <StudentCard
@@ -397,12 +428,12 @@ export default function DiscoverPage() {
         student={student}
         myInterests={myInterests}
         isFriend={friend}
-        requested={sentRequests.includes(student.id)}
-        onAdd={() => handleAddFriend(student.id)}
+        requested={isRequested(student.userId)}
+        onAdd={() => handleAddFriend(student)}
         onMessage={() => openChat(student)}
         onRemove={
           friend
-            ? () => handleRemoveFriend(student.id)
+            ? () => handleRemoveFriend(student)
             : undefined
         }
       />
@@ -488,7 +519,7 @@ export default function DiscoverPage() {
           <Button
             type="button"
             variant="ghost"
-            onClick={loadData}
+            onClick={retry}
             loading={loading}
           >
             Refresh
