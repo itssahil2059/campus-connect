@@ -82,12 +82,12 @@ def test_chat_after_disconnect_is_read_only(page, wait, alice, bob):
     assert not page.find_elements(By.NAME, "message")
 
 
-def test_discover_add_friend_then_message(page, wait, alice, bob):
-    # Alice finds Bob under Discover > Everyone and adds him.
+def test_discover_connect_message_and_remove(page, wait, alice, bob):
+    # Alice finds Bob under Discover > Everyone and connects.
     log_in_as(page, alice, "/discover")
     click_button(wait, "Everyone")
-    click_button(wait, "Add friend")
-    wait.until(EC.visibility_of_element_located((By.XPATH, "//button[normalize-space()='Request sent']")))
+    click_button(wait, "Connect")
+    wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, "[data-testid=connect-controls]"), "Requested"))
     connection = Connection.objects.get()
     assert (connection.from_user, connection.to_user) == (alice, bob)
 
@@ -104,3 +104,11 @@ def test_discover_add_friend_then_message(page, wait, alice, bob):
     wait.until(EC.url_matches(r"/messages/\d+$"))
     chat = Conversation.objects.get()
     assert page.current_url.endswith(f"/messages/{chat.id}")
+
+    # Back on Friends, Remove takes Bob off the tab straight away.
+    page.back()
+    click_button(wait, "Friends")
+    click_button(wait, "Remove")
+    page.switch_to.alert.accept()  # "Remove this connection?"
+    wait.until(EC.invisibility_of_element_located((By.XPATH, "//article[contains(., 'bob')]")))
+    assert not Connection.objects.exists()
