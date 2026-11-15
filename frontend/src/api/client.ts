@@ -74,6 +74,11 @@ export function fieldErrors(err: unknown): Record<string, string> {
     // nonFieldErrors isn't a form field; errorMessage() handles it.
     if (field === "nonFieldErrors") continue;
     if (Array.isArray(value) && typeof value[0] === "string") out[field] = value[0];
+    // List fields report per-item errors keyed by index: {"0": ["Enter a valid URL."]}
+    else if (value && typeof value === "object") {
+      const first = Object.values(value as Record<string, unknown>)[0];
+      if (Array.isArray(first) && typeof first[0] === "string") out[field] = first[0];
+    }
   }
   return out;
 }

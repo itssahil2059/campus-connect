@@ -14,6 +14,8 @@ class Profile(models.Model):
     interests = models.JSONField(default=list, blank=True)
     likes = models.JSONField(default=list, blank=True)
     dislikes = models.JSONField(default=list, blank=True)
+    # Up to 5 http(s) URLs: LinkedIn, GitHub, Instagram, a portfolio, etc.
+    links = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

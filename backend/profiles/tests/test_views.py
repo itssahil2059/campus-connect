@@ -56,6 +56,28 @@ class TestMyProfile:
         assert response.status_code == 400
         assert "interests" in response.data
 
+    def test_links_are_cleaned(self, client_for, alice):
+        links = [" github.com/alice ", "https://github.com/alice", "", "http://alice.dev"]
+
+        response = client_for(alice).put(ME_URL, {**PROFILE_DATA, "links": links}, format="json")
+
+        assert response.status_code == 201
+        assert response.data["links"] == ["https://github.com/alice", "http://alice.dev"]
+
+    @pytest.mark.parametrize("bad", ["javascript:alert(1)", "ftp://files.example.com", "not a url"])
+    def test_bad_links_rejected(self, client_for, alice, bad):
+        response = client_for(alice).put(ME_URL, {**PROFILE_DATA, "links": [bad]}, format="json")
+
+        assert response.status_code == 400
+        assert "links" in response.data
+
+    def test_too_many_links_rejected(self, client_for, alice):
+        links = [f"https://site{i}.com" for i in range(6)]
+
+        response = client_for(alice).put(ME_URL, {**PROFILE_DATA, "links": links}, format="json")
+
+        assert response.status_code == 400
+
     def test_requires_login(self, api_client):
         assert api_client.get(ME_URL).status_code == 401
         assert api_client.put(ME_URL, PROFILE_DATA, format="json").status_code == 401

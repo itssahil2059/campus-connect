@@ -15,6 +15,7 @@ export interface MyProfile {
   interests: string[];
   likes: string[];
   dislikes: string[];
+  links: string[];
 }
 
 export interface PublicProfile {
@@ -28,6 +29,7 @@ export interface PublicProfile {
   interests: string[];
   likes: string[];
   dislikes: string[];
+  links: string[];
 }
 
 export interface Question {
