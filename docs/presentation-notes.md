@@ -492,6 +492,27 @@ and validated the Nginx config with `nginx -t` in Docker.
 
 ---
 
+## 12. Profile links + search/filter (branch `sa12-profile-links-search`)
+- **Profile links:** students can add up to 5 links (LinkedIn, GitHub,
+  Instagram, a portfolio). Stored as a JSON list on Profile, like interests.
+- **Why only http(s):** a link is rendered as `<a href>`, and a
+  `javascript:` URL there would run code when clicked. The serializer only
+  accepts http/https, so that can't happen. Typing `github.com/sam` works:
+  the backend adds `https://`.
+- **Search/filter:** `GET /api/profiles/` takes `q`, `college`, `interest`,
+  `like` and `dislike`. Tag filters use Postgres JSON "contains" (`@>`), so
+  `?interest=hiking&interest=coding` means "has both", done in one query.
+- **Why on the server, not in the browser:** the old Search tab filtered
+  the students already loaded on the page. That stops working once there
+  are more students than one page, and it couldn't see likes/dislikes. Now
+  the page sends the filters to the API (300 ms after you stop typing) and
+  ignores out-of-date responses.
+- **Tests:** a parametrized pytest table for every filter, and two Selenium
+  tests (add a link and see it on the profile; search by tag and by text).
+- **Deploy:** the earlier Discover fix went live first (`deploy.sh dev`).
+
+---
+
 ## Git workflow (worth mentioning — version control is 25% of the grade)
 - Feature branches per task (`sa1-api-docs`, `sa2-auth`), merged into `dev`
   via pull requests. Teammates use the same flow (`setup-cezar`,
@@ -509,7 +530,9 @@ and validated the Nginx config with `nginx -t` in Docker.
 2. Sign up with a `.edu` address → "Check your inbox" page.
 3. Copy the link from the Django terminal and open it → "You're verified".
 4. Log in (try a wrong password first to show the error) → profile setup.
-5. Fill in bio, interests and the questionnaire → Finish setup → Home shows
+5. Fill in bio, interests, a link and the questionnaire → Finish setup → Home shows
    other students; click a card to open their profile.
-6. Run the tests live: `pytest` (API) and `HEADED=1 pytest tests_ui` (watch
+6. Discover → Search: type a like (e.g. `coffee`) and press Enter; the list
+   narrows to students who like it.
+7. Run the tests live: `pytest` (API) and `HEADED=1 pytest tests_ui` (watch
    Chrome click through signup and login on its own).

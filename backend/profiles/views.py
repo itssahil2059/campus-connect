@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -39,10 +40,45 @@ class MyProfileView(APIView):
         )
 
 
+# Query param -> Profile JSON field. Each can repeat; all must match.
+TAG_FILTERS = {"interest": "interests", "like": "likes", "dislike": "dislikes"}
+MAX_QUERY_LENGTH = 100
+
+
+def filter_profiles(queryset, params):
+    """Narrow profiles by the search/filter query params (all ANDed together).
+
+    ?q=        text in username, college or bio (case-insensitive)
+    ?college=  text in college name
+    ?interest= / ?like= / ?dislike=   exact tag; repeat for "has all of these"
+    """
+    q = params.get("q", "").strip()[:MAX_QUERY_LENGTH]
+    if q:
+        queryset = queryset.filter(
+            Q(user__username__icontains=q)
+            | Q(user__college_name__icontains=q)
+            | Q(bio__icontains=q)
+        )
+
+    college = params.get("college", "").strip()[:MAX_QUERY_LENGTH]
+    if college:
+        queryset = queryset.filter(user__college_name__icontains=college)
+
+    for param, field in TAG_FILTERS.items():
+        # Tags are stored lowercased (see TagListField), so match that way.
+        tags = [t.strip().lower() for t in params.getlist(param) if t.strip()]
+        if tags:
+            # Postgres JSON "contains" (@>): the list includes every tag.
+            queryset = queryset.filter(**{f"{field}__contains": tags})
+
+    return queryset
+
+
 class ProfileViewSet(viewsets.ReadOnlyModelViewSet):
     """GET /api/profiles/ and /api/profiles/<id>/ — other students' profiles.
 
-    Only verified, active users, and never yourself.
+    Only verified, active users, and never yourself. The list can be narrowed
+    with search/filter query params; see filter_profiles().
     """
 
     serializer_class = PublicProfileSerializer
@@ -50,12 +86,15 @@ class ProfileViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_value_regex = r"\d+"
 
     def get_queryset(self):
-        return (
+        queryset = (
             Profile.objects.filter(user__is_active=True, user__is_edu_verified=True)
             .exclude(user=self.request.user)
             .select_related("user")  # one query instead of one per profile
             .order_by("-updated_at")
         )
+        if self.action == "list":
+            queryset = filter_profiles(queryset, self.request.query_params)
+        return queryset
 
 
 class QuestionViewSet(viewsets.ReadOnlyModelViewSet):

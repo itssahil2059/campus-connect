@@ -135,11 +135,12 @@ python manage.py runserver
 1. **User auth + .edu verification** — signup, login, school-email domain check,
    email verification via `default_token_generator`. **Done, with pytest + Selenium tests.**
 2. Profile creation + preference quiz (incl. image upload via S3, and an
-   "insert links" field). **Profile + questionnaire API and pages done; image
-   upload and links field not yet.**
+   "insert links" field). **Profile + questionnaire API and pages done, links
+   field done; image upload (S3) not yet.**
 3. Suggested Interest / discovery feed — looser, randomized browse surface
    ("like YouTube subscriptions" per the team's own description).
 4. Search/Filter — precise narrowing (name, college, interests, likes/dislikes).
+   **Done:** query params on `GET /api/profiles/`, used by Discover → Search.
 5. Connections ("interest"/"friend") — private to the user, others can't see who
    you've added.
 6. Messaging/chat — multiple private chats. **Open question below** on whether
@@ -166,7 +167,8 @@ deploy working after step 1 or 2 so it's not a last-week scramble.
 
 ## Not yet built
 - Matching app (quiz model + weighted scoring engine)
-- Discovery/search apps
+- Discovery feed ranking (Discover's "match %" is still a client-side
+  interest overlap; real scoring belongs in the matching app)
 - Chat app (Channels consumers/routing)
 - Safety app (walk-me-back, trusted-friend check-in)
 - Frontend beyond the demo flow (signup/verify/login/profile setup/home/profile

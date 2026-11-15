@@ -2,6 +2,7 @@
 
 import pytest
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 
 from profiles.models import Profile
@@ -24,3 +25,29 @@ def test_add_link_shows_on_profile(page, wait, alice, bob):
     link = wait.until(EC.visibility_of_element_located((By.LINK_TEXT, "github.com/alice")))
     assert link.get_attribute("href") == "https://github.com/alice"
     assert link.get_attribute("target") == "_blank"
+
+
+def test_search_by_text_and_tags(page, wait, alice, bob, make_student):
+    Profile.objects.filter(user=bob).update(interests=["hiking"], likes=["coffee"])
+    carol = make_student("carol")
+    Profile.objects.create(user=carol, bio="Night owl", interests=["hiking"])
+
+    log_in_as(page, alice, "/discover")
+    click_button(wait, "Search")
+
+    def results():
+        """Usernames on the result cards, once the count matches the cards."""
+        count = page.find_element(By.CSS_SELECTOR, "[data-testid=search-count]").text
+        cards = page.find_elements(By.XPATH, "//article//p[contains(@class, 'font-semibold')]")
+        return sorted(c.text for c in cards) if count.startswith(str(len(cards))) else None
+
+    wait.until(lambda _: results() == ["bob", "carol"])
+
+    # A tag filter narrows it down on the server: only Bob likes coffee.
+    page.find_element(By.NAME, "search-like").send_keys("coffee", Keys.ENTER)
+    wait.until(lambda _: results() == ["bob"])
+
+    # Clear, then search text in the bio.
+    click_button(wait, "Clear")
+    page.find_element(By.ID, "discover-search").send_keys("night owl")
+    wait.until(lambda _: results() == ["carol"])
