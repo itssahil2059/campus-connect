@@ -3,9 +3,10 @@
 Each run starts:
   - a throwaway Django server on the test database (pytest-django's live_server)
   - a Vite dev server for the React app, pointed at that Django server
-  - headless Chrome (set HEADED=1 to watch the browser)
+  - headless Chrome (pass --headed, or set HEADED=1, to watch the browser)
 
-Run with:  cd backend && pytest tests_ui
+Run with:  cd backend && pytest tests_ui            (headless)
+           cd backend && pytest tests_ui --headed   (visible Chrome, for demos)
 """
 
 import os
@@ -65,11 +66,20 @@ def _frontend_settings(settings):
     settings.FRONTEND_URL = FRONTEND_URL
 
 
+def headed(config):
+    return config.getoption("headed") or bool(os.environ.get("HEADED"))
+
+
 @pytest.fixture(scope="session")
-def browser():
+def browser(pytestconfig):
+    """One Chrome for the whole run (starting Chrome is the slow part)."""
     options = webdriver.ChromeOptions()
-    if not os.environ.get("HEADED"):
+    if not headed(pytestconfig):
         options.add_argument("--headless=new")
+    if os.environ.get("CI"):
+        # GitHub Actions runners: no sandbox and a small /dev/shm.
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1280,900")
     driver = webdriver.Chrome(options=options)  # Selenium finds/downloads chromedriver
     yield driver
