@@ -5,7 +5,8 @@
 #
 # Contains: backend/tests_ui (Selenium), every app's tests/ folder (pytest),
 # backend/conftest.py, backend/pytest.ini, backend/core/testing.py (constants
-# the tests import) and docs/test-cases.md. Only files tracked by git are
+# the tests import), backend/requirements.txt (shows the pytest + Selenium
+# frameworks) and docs/test-cases.md. Only files tracked by git are
 # included, so caches and local junk stay out. Commit before running.
 set -euo pipefail
 
@@ -18,6 +19,7 @@ FILES=$(git ls-files \
   backend/conftest.py \
   backend/pytest.ini \
   backend/core/testing.py \
+  backend/requirements.txt \
   docs/test-cases.md)
 
 if [ -z "$FILES" ]; then
