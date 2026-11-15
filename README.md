@@ -1,5 +1,7 @@
 # Git Together (working title: Campus Connect)
 
+[![CI](https://github.com/itssahil2059/campus-connect/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/itssahil2059/campus-connect/actions/workflows/ci.yml)
+
 A social hub for verified college students. Sign up with a `.edu` email, verify
 it, build a profile and answer a short preference questionnaire, then browse
 other verified students.
@@ -129,10 +131,18 @@ Admin site (users, profiles, questions, tokens): http://127.0.0.1:8000/admin/
 From `backend/` with the venv active:
 
 ```bash
-pytest                    # API tests (fast, ~5s)
-pytest tests_ui           # Selenium browser tests (~10s)
-HEADED=1 pytest tests_ui  # same, but watch Chrome click through
+pytest                       # 130 unit/API tests (~25 s)
+pytest tests_ui              # 25 Selenium browser tests, headless Chrome (~35 s)
+pytest tests_ui --headed     # same, but watch Chrome click through (HEADED=1 also works)
+pytest tests_ui -k ui05      # a single UI test by its ID
 ```
+
+- Every test case is listed in [docs/test-cases.md](docs/test-cases.md).
+- CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs pytest, the
+  frontend lint + build and the Selenium tests on every pull request and on
+  pushes to `dev`/`main`.
+- `scripts/make-testcases-zip.sh` builds `GitTogether_testcases.zip` (the
+  tests + docs/test-cases.md) for the P8 submission.
 
 - Tests use a separate throwaway database, so your local data is never touched.
 - The UI tests start their own backend and frontend servers (frontend on

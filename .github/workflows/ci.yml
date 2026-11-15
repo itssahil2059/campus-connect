@@ -1,0 +1,106 @@
+# Runs on every pull request, and on pushes to dev and main:
+#   backend  - pytest unit/API tests
+#   frontend - lint + production build
+#   ui       - Selenium tests in headless Chrome
+# Nothing here touches AWS or the live server. The secrets below are dummies
+# that only exist inside this throwaway CI machine.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+
+# A newer push to the same branch/PR cancels the older run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SECRET_KEY: ci-dummy-secret-not-used-anywhere-real
+  POSTGRES_DB: campus_connect
+  POSTGRES_USER: campus_connect
+  POSTGRES_PASSWORD: ci-dummy-password
+  POSTGRES_HOST: localhost
+  POSTGRES_PORT: "5432"
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: campus_connect
+          POSTGRES_USER: campus_connect
+          POSTGRES_PASSWORD: ci-dummy-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U campus_connect"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - run: python manage.py makemigrations --check --dry-run  # model change without a migration fails CI
+      - run: pytest -q
+
+  frontend:
+    name: Frontend (lint + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  ui:
+    name: UI tests (Selenium, headless)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: campus_connect
+          POSTGRES_USER: campus_connect
+          POSTGRES_PASSWORD: ci-dummy-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U campus_connect"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: pip install -r backend/requirements.txt
+      # The UI tests start the Vite dev server themselves, so they need node_modules.
+      - run: npm ci
+        working-directory: frontend
+      # Chrome is preinstalled on GitHub's Ubuntu runners; Selenium downloads
+      # the matching chromedriver by itself.
+      - run: pytest tests_ui -q
+        working-directory: backend
