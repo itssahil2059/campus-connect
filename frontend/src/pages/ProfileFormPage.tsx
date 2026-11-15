@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError, apiGet, apiPost, apiPut, errorMessage, fieldErrors } from "../api/client";
 import type { Answer, MyProfile, Question } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
+import LinksInput from "../components/LinksInput";
 import TagInput from "../components/TagInput";
 import { Alert, Button, Spinner } from "../components/ui";
 
@@ -19,6 +20,7 @@ export default function ProfileFormPage() {
   const [interests, setInterests] = useState<string[]>([]);
   const [likes, setLikes] = useState<string[]>([]);
   const [dislikes, setDislikes] = useState<string[]>([]);
+  const [links, setLinks] = useState<string[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   // question id -> chosen option
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -39,6 +41,7 @@ export default function ProfileFormPage() {
           setInterests(p.interests);
           setLikes(p.likes);
           setDislikes(p.dislikes);
+          setLinks(p.links);
         }
         setQuestions(qs);
         setAnswers(Object.fromEntries(as.map((a) => [a.question, a.choice])));
@@ -53,7 +56,13 @@ export default function ProfileFormPage() {
     setErrors({});
     setFormError("");
     try {
-      await apiPut("/api/profiles/me/", { bio, interests, likes, dislikes });
+      await apiPut("/api/profiles/me/", {
+        bio,
+        interests,
+        likes,
+        dislikes,
+        links: links.filter((l) => l.trim()),
+      });
       const answerList = Object.entries(answers).map(([question, choice]) => ({
         question: Number(question),
         choice,
@@ -120,6 +129,7 @@ export default function ProfileFormPage() {
           <TagInput label="Dislikes" name="dislikes" value={dislikes} onChange={setDislikes}
             placeholder="e.g. 8am classes" error={errors.dislikes} />
         </div>
+        <LinksInput value={links} onChange={setLinks} error={errors.links} />
       </section>
 
       <section className="space-y-6 rounded-3xl border border-line bg-white p-6 sm:p-8">

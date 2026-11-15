@@ -52,6 +52,24 @@ export default function ProfileViewPage() {
             <TagSection title="Likes" tags={profile.likes} tone="accent" />
             <TagSection title="Dislikes" tags={profile.dislikes} />
           </div>
+
+          {profile.links.length > 0 && (
+            <section className="mt-8">
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">Links</h2>
+              <ul className="space-y-1.5">
+                {profile.links.map((url) => (
+                  <li key={url}>
+                    {/* noopener: the other site can't control this tab. The backend
+                        only accepts http(s) URLs, so href can't run script. */}
+                    <a href={url} target="_blank" rel="noopener noreferrer"
+                      className="text-sm font-medium text-accent-dark underline-offset-2 hover:underline">
+                      {url.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </article>
       )}
     </div>

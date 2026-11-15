@@ -5,27 +5,43 @@ import type { Connection, ConnectionWith, Conversation } from "../api/types";
 import { Button } from "./ui";
 
 /**
- * The connection controls on someone's profile. Shows what fits the
+ * The connection controls on someone's profile or card. Shows what fits the
  * current state: Connect -> Requested (cancel) -> Accept/Decline -> Message.
+ *
+ * `initial`: the state, if the parent already loaded it (Discover loads all
+ * connections at once), so a page of cards doesn't make one request each.
+ * `onChange`: called after every change, so the parent can stay in sync.
  */
-export default function ConnectButton({ userId }: { userId: number }) {
+export default function ConnectButton({
+  userId,
+  initial,
+  onChange,
+}: {
+  userId: number;
+  initial?: ConnectionWith;
+  onChange?: (state: ConnectionWith) => void;
+}) {
   const navigate = useNavigate();
-  const [state, setState] = useState<ConnectionWith | null>(null);
+  const [state, setState] = useState<ConnectionWith | null>(initial ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const hasInitial = initial !== undefined;
 
   useEffect(() => {
+    if (hasInitial) return;
     apiGet<ConnectionWith>(`/api/connections/with/${userId}/`)
       .then(setState)
       .catch((err) => setError(errorMessage(err)));
-  }, [userId]);
+  }, [userId, hasInitial]);
 
   /** Runs an action, then shows the new state (or the error). */
   async function run(action: () => Promise<ConnectionWith>) {
     setBusy(true);
     setError("");
     try {
-      setState(await action());
+      const next = await action();
+      setState(next);
+      onChange?.(next);
     } catch (err) {
       setError(errorMessage(err));
     } finally {

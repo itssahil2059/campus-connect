@@ -87,3 +87,21 @@ def page(browser, frontend):
 @pytest.fixture
 def wait(browser):
     return WebDriverWait(browser, 10)
+
+
+@pytest.fixture
+def alice(make_student):
+    from profiles.models import Profile
+
+    user = make_student("alice")
+    Profile.objects.create(user=user, bio="Alice's bio")
+    return user
+
+
+@pytest.fixture
+def bob(make_student):
+    from profiles.models import Profile
+
+    user = make_student("bob")
+    Profile.objects.create(user=user, bio="Bob's bio")
+    return user

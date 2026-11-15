@@ -20,7 +20,7 @@ tested: build the frontend against those exactly.
 ## Profiles & questionnaire (Weeks 4–5)
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET / PUT | /api/profiles/me/ | My profile |
+| GET / PUT | /api/profiles/me/ | My profile (`bio`, `interests`, `likes`, `dislikes`, `links`: up to 5 http(s) URLs) |
 | GET | /api/profiles/<id>/ | Another student's profile (includes `user_id`, used for connections and chat) |
 | POST | /api/profiles/me/photo/ | Upload profile photo |
 | GET | /api/questions/ | Questionnaire questions |
@@ -30,12 +30,25 @@ tested: build the frontend against those exactly.
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | /api/discover/ | Suggested students, best match first |
-| GET | /api/search/?q=&college=&interest= | Search and filter |
+| GET | /api/profiles/?q=&college=&interest=&like=&dislike= | Search and filter (done; see below) |
 | GET / POST | /api/connections/ | My connections and requests / send a request |
 | POST | /api/connections/<id>/accept/ | Accept a request |
 | POST | /api/connections/<id>/decline/ | Decline a request |
 | DELETE | /api/connections/<id>/ | Cancel my request / remove a connection |
 | GET | /api/connections/with/<user_id>/ | My status with one student (profile button) |
+
+### Contract: search and filter
+Search is the normal profile list with optional query params; they combine
+with AND, and blank ones are ignored.
+
+| Param | Matches |
+| --- | --- |
+| `q` | text in username, college or bio (case-insensitive, partial) |
+| `college` | text in college name (case-insensitive, partial) |
+| `interest`, `like`, `dislike` | exact tag (case-insensitive); repeat a param to require all, e.g. `?interest=hiking&interest=coding` |
+
+Returns the same list as `GET /api/profiles/` (never yourself, only verified
+students).
 
 ### Contract: connections
 

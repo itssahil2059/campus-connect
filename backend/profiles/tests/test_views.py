@@ -56,6 +56,28 @@ class TestMyProfile:
         assert response.status_code == 400
         assert "interests" in response.data
 
+    def test_links_are_cleaned(self, client_for, alice):
+        links = [" github.com/alice ", "https://github.com/alice", "", "http://alice.dev"]
+
+        response = client_for(alice).put(ME_URL, {**PROFILE_DATA, "links": links}, format="json")
+
+        assert response.status_code == 201
+        assert response.data["links"] == ["https://github.com/alice", "http://alice.dev"]
+
+    @pytest.mark.parametrize("bad", ["javascript:alert(1)", "ftp://files.example.com", "not a url"])
+    def test_bad_links_rejected(self, client_for, alice, bad):
+        response = client_for(alice).put(ME_URL, {**PROFILE_DATA, "links": [bad]}, format="json")
+
+        assert response.status_code == 400
+        assert "links" in response.data
+
+    def test_too_many_links_rejected(self, client_for, alice):
+        links = [f"https://site{i}.com" for i in range(6)]
+
+        response = client_for(alice).put(ME_URL, {**PROFILE_DATA, "links": links}, format="json")
+
+        assert response.status_code == 400
+
     def test_requires_login(self, api_client):
         assert api_client.get(ME_URL).status_code == 401
         assert api_client.put(ME_URL, PROFILE_DATA, format="json").status_code == 401
@@ -164,3 +186,56 @@ class TestQuestionnaire:
     def test_requires_login(self, api_client):
         assert api_client.get(QUESTIONS_URL).status_code == 401
         assert api_client.get(ANSWERS_URL).status_code == 401
+
+
+@pytest.mark.django_db
+class TestProfileSearch:
+    @pytest.fixture
+    def students(self, make_user, alice):
+        """Three other students with different colleges and tags."""
+
+        def student(name, college, bio="", **tags):
+            user = make_user(
+                username=name, school_email=f"{name}@x.edu",
+                college_name=college, is_edu_verified=True,
+            )
+            return Profile.objects.create(user=user, bio=bio, **tags)
+
+        Profile.objects.create(user=alice, interests=["hiking"])  # never in results
+        return {
+            "sam": student("sam", "Texas A&M-Texarkana", "Night owl coder",
+                           interests=["hiking", "coding"], likes=["coffee"]),
+            "riya": student("riya", "Rice University", "Loves museums",
+                            interests=["art", "hiking"], dislikes=["coffee"]),
+            "leo": student("leo", "Texas A&M-Texarkana",
+                           interests=["gaming"], likes=["coffee", "tacos"]),
+        }
+
+    def search(self, client_for, alice, params):
+        response = client_for(alice).get(LIST_URL, params)
+        assert response.status_code == 200
+        return sorted(p["username"] for p in response.data)
+
+    @pytest.mark.parametrize("params, expected", [
+        ({}, ["leo", "riya", "sam"]),
+        ({"q": "SAM"}, ["sam"]),                      # username, any case
+        ({"q": "rice"}, ["riya"]),                    # college
+        ({"q": "museum"}, ["riya"]),                  # bio
+        ({"college": "texarkana"}, ["leo", "sam"]),
+        ({"interest": "Hiking"}, ["riya", "sam"]),    # tags are lowercased
+        ({"interest": ["hiking", "coding"]}, ["sam"]),  # must have all
+        ({"like": "coffee"}, ["leo", "sam"]),
+        ({"dislike": "coffee"}, ["riya"]),
+        ({"college": "texarkana", "like": "tacos"}, ["leo"]),  # filters combine
+        ({"interest": "hik"}, []),                    # tags match exactly, not partly
+        ({"q": "   "}, ["leo", "riya", "sam"]),       # blank params are ignored
+    ])
+    def test_filters(self, client_for, alice, students, params, expected):
+        assert self.search(client_for, alice, params) == expected
+
+    def test_never_includes_yourself(self, client_for, alice, students):
+        assert "alice" not in self.search(client_for, alice, {"interest": "hiking"})
+
+    def test_detail_ignores_filters(self, client_for, alice, students):
+        url = detail_url(students["leo"])
+        assert client_for(alice).get(url, {"q": "nobody"}).status_code == 200

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiGet, errorMessage } from "../api/client";
-import type { Connection, MyProfile, PublicProfile } from "../api/types";
+import type { Connection, ConnectionWith, MyProfile, PublicProfile } from "../api/types";
 import ConnectButton from "../components/ConnectButton";
+import TagInput from "../components/TagInput";
 import {
   Alert,
   Avatar,
@@ -15,6 +16,8 @@ import {
 const MATCH_THRESHOLD = 20;
 const MAX_CHIPS = 4;
 const USE_SAMPLE_DATA = false;
+/** Wait this long after the last keystroke before searching. */
+const SEARCH_DELAY_MS = 300;
 
 type Tab = "discover" | "friends";
 type Sub = "suggested" | "everyone" | "search";
@@ -138,9 +141,13 @@ async function fetchDiscoverData(): Promise<{
 function StudentCard({
   student,
   myInterests,
+  connection,
+  onConnectionChange,
 }: {
   student: Student;
   myInterests: string[];
+  connection: ConnectionWith;
+  onConnectionChange: (state: ConnectionWith) => void;
 }) {
   const mine = myInterests.map((i) => i.toLowerCase());
   const extra = student.interests.length - MAX_CHIPS;
@@ -202,7 +209,11 @@ function StudentCard({
               Connect (sample data)
             </Button>
           ) : (
-            <ConnectButton userId={student.userId} />
+            <ConnectButton
+              userId={student.userId}
+              initial={connection}
+              onChange={onConnectionChange}
+            />
           )}
         </div>
 
@@ -237,6 +248,12 @@ export default function DiscoverPage() {
 
   const [search, setSearch] = useState("");
   const [college, setCollege] = useState("All");
+  const [interestTags, setInterestTags] = useState<string[]>([]);
+  const [likeTags, setLikeTags] = useState<string[]>([]);
+  const [dislikeTags, setDislikeTags] = useState<string[]>([]);
+  // null while the first search is loading.
+  const [searchResults, setSearchResults] = useState<Student[] | null>(null);
+  const [searchError, setSearchError] = useState("");
 
   // Fetch first, then set state in .then(), so the effect never sets
   // state synchronously (what the react-hooks lint rule checks for).
@@ -256,8 +273,9 @@ export default function DiscoverPage() {
     loadData();
   }, [loadData]);
 
-  // Opening the Friends tab refreshes it, so someone you just connected
-  // with from a card shows up there.
+  // Opening the Friends tab refreshes it, so a request someone accepted
+  // while you were on the page shows up there. (Changes you make from a card
+  // are already synced through updateConnection.)
   useEffect(() => {
     if (tab === "friends") loadData();
   }, [tab, loadData]);
@@ -287,28 +305,51 @@ export default function DiscoverPage() {
     [students]
   );
 
-  const searchResults = useMemo(() => {
-    const query = search.trim().toLowerCase();
+  // Search runs on the server (GET /api/profiles/?q=...&interest=...), so it
+  // also covers likes/dislikes and doesn't depend on what this page loaded.
+  const isSearching = tab === "discover" && sub === "search";
+  useEffect(() => {
+    if (!isSearching) return;
 
-    return students
-      .filter(
-        (student) =>
-          college === "All" || student.college === college
-      )
-      .filter((student) => {
-        if (!query) return true;
+    const params = new URLSearchParams();
+    if (search.trim()) params.set("q", search.trim());
+    if (college !== "All") params.set("college", college);
+    interestTags.forEach((tag) => params.append("interest", tag));
+    likeTags.forEach((tag) => params.append("like", tag));
+    dislikeTags.forEach((tag) => params.append("dislike", tag));
 
-        return (
-          student.name.toLowerCase().includes(query) ||
-          student.college.toLowerCase().includes(query) ||
-          student.bio.toLowerCase().includes(query) ||
-          student.interests.some((interest) =>
-            interest.toLowerCase().includes(query)
-          )
-        );
-      })
-      .sort((a, b) => b.match - a.match);
-  }, [students, search, college]);
+    // Ignore a response that arrives after the filters changed again.
+    let stale = false;
+    const timer = setTimeout(() => {
+      const request = USE_SAMPLE_DATA
+        ? Promise.resolve(students)
+        : apiGet<PublicProfile[]>(`/api/profiles/?${params}`).then((profiles) =>
+            profiles.map((profile) => fromProfile(profile, myInterests))
+          );
+      request
+        .then((results) => {
+          if (stale) return;
+          setSearchError("");
+          setSearchResults([...results].sort((a, b) => b.match - a.match));
+        })
+        .catch((err) => {
+          if (!stale) setSearchError(errorMessage(err));
+        });
+    }, SEARCH_DELAY_MS);
+
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [isSearching, search, college, interestTags, likeTags, dislikeTags, students, myInterests]);
+
+  function clearSearch() {
+    setSearch("");
+    setCollege("All");
+    setInterestTags([]);
+    setLikeTags([]);
+    setDislikeTags([]);
+  }
 
   // Suggested includes every student with a match of 20% or higher.
   const suggestions = useMemo(
@@ -325,12 +366,29 @@ export default function DiscoverPage() {
     [students]
   );
 
+  /** A card's connect button changed something: keep the Friends tab in sync. */
+  function updateConnection(userId: number, next: ConnectionWith) {
+    setConnections((current) => {
+      const copy = { ...current };
+      if (next.connection) copy[userId] = next.connection;
+      else delete copy[userId];
+      return copy;
+    });
+  }
+
   function renderCard(student: Student) {
+    const connection = connections[student.userId];
     return (
       <StudentCard
         key={student.id}
         student={student}
         myInterests={myInterests}
+        connection={
+          connection
+            ? { status: connection.status, connection }
+            : { status: "none", connection: null }
+        }
+        onConnectionChange={(next) => updateConnection(student.userId, next)}
       />
     );
   }
@@ -519,7 +577,7 @@ export default function DiscoverPage() {
                           type="text"
                           value={search}
                           onChange={(e) => setSearch(e.target.value)}
-                          placeholder="Search by username, college, bio, or interest..."
+                          placeholder="Search by username, college, or bio..."
                           className="w-full rounded-xl border border-line px-4 py-3 text-sm outline-none focus:border-ink"
                         />
 
@@ -539,36 +597,57 @@ export default function DiscoverPage() {
                         <Button
                           type="button"
                           variant="ghost"
-                          onClick={() => {
-                            setSearch("");
-                            setCollege("All");
-                          }}
+                          onClick={clearSearch}
                         >
                           Clear
                         </Button>
                       </div>
 
+                      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                        <TagInput label="Has interests" name="search-interest"
+                          value={interestTags} onChange={setInterestTags} placeholder="e.g. hiking" />
+                        <TagInput label="Likes" name="search-like"
+                          value={likeTags} onChange={setLikeTags} placeholder="e.g. coffee" />
+                        <TagInput label="Dislikes" name="search-dislike"
+                          value={dislikeTags} onChange={setDislikeTags} placeholder="e.g. smoking" />
+                      </div>
+
                       <p className="mt-3 text-xs text-muted">
-                        Search results include all students, regardless
-                        of their match percentage.
+                        Tags match exactly, and students must have all of
+                        them. Results include all students, regardless of
+                        their match percentage.
                       </p>
                     </div>
 
-                    <p className="mt-4 text-sm text-muted">
-                      {searchResults.length}{" "}
-                      {searchResults.length === 1 ? "result" : "results"}{" "}
-                      found.
-                    </p>
+                    {searchError && (
+                      <div className="mt-4">
+                        <Alert>{searchError}</Alert>
+                      </div>
+                    )}
 
-                    {searchResults.length > 0 ? (
-                      <div className="mt-5 grid gap-4 md:grid-cols-2">
-                        {searchResults.map(renderCard)}
+                    {!searchResults ? (
+                      <div className="flex justify-center py-12">
+                        <Spinner />
                       </div>
                     ) : (
-                      <p className="mt-8 text-center text-muted">
-                        No students match your search. Try another name,
-                        interest, or college.
-                      </p>
+                      <>
+                        <p className="mt-4 text-sm text-muted" data-testid="search-count">
+                          {searchResults.length}{" "}
+                          {searchResults.length === 1 ? "result" : "results"}{" "}
+                          found.
+                        </p>
+
+                        {searchResults.length > 0 ? (
+                          <div className="mt-5 grid gap-4 md:grid-cols-2">
+                            {searchResults.map(renderCard)}
+                          </div>
+                        ) : (
+                          <p className="mt-8 text-center text-muted">
+                            No students match your search. Try another name,
+                            interest, or college.
+                          </p>
+                        )}
+                      </>
                     )}
                   </>
                 )}
