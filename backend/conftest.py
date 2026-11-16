@@ -6,6 +6,17 @@ from core.testing import PASSWORD
 from users.models import CustomUser
 
 
+def pytest_addoption(parser):
+    # Declared here (the root conftest) because pytest only reads custom
+    # options from conftest files it loads at startup. Used by tests_ui/.
+    parser.addoption(
+        "--headed",
+        action="store_true",
+        help="UI tests: show the Chrome window instead of running headless "
+        "(same as HEADED=1).",
+    )
+
+
 @pytest.fixture
 def api_client():
     """A DRF test client: sends JSON requests to the app without a real server."""

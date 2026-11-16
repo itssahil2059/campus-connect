@@ -23,3 +23,6 @@ dist/
 .vscode/
 .idea/
 _to_delete/
+
+# P8 submission zip (built by scripts/make-testcases-zip.sh)
+GitTogether_testcases.zip

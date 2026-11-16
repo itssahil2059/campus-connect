@@ -513,6 +513,35 @@ and validated the Nginx config with `nginx -t` in Docker.
 
 ---
 
+## 13. P8: test cases, automation and CI (branch `sa13-p8-test-cases`)
+- **155 automated tests:** 130 pytest unit/API tests and 25 Selenium UI tests.
+  Every UI test checks one thing and has an ID (UI-01…UI-25) that matches
+  `docs/test-cases.md`.
+- **pytest fixtures, in plain words:** a fixture is a setup step a test asks
+  for by name. Writing `def test_x(page, alice)` means "before this test,
+  give me a fresh browser page and a verified student called alice."
+  pytest builds them, hands them in, and cleans up afterwards (empties the
+  database, logs out). Fixtures can use other fixtures: `page` needs
+  `browser` and `frontend`, so asking for `page` starts Chrome and the
+  React server too. Expensive ones (Chrome, the dev server) are
+  `scope="session"`, which means they start once for the whole run instead
+  of once per test.
+- **Selenium waits, in plain words:** the browser is slower than the test
+  code. After a click, the page still has to call the API and redraw, so
+  checking straight away would fail at random. `wait.until(...)` means
+  "keep checking every half second, for up to 10 seconds, until this is
+  true," e.g. until the URL contains `/home` or "Requested" appears. It
+  moves on the moment it's true, so tests stay fast, and if it never
+  happens the test fails with a timeout. We never use `sleep()`.
+- **CI (GitHub Actions):** every pull request runs the backend tests, the
+  frontend lint + build and the Selenium tests in headless Chrome on a
+  fresh Linux machine. Branch protection on `dev`/`main` means a PR can't be
+  merged while CI is red. This would have caught the test PR #17 broke.
+- **Demo:** `pytest tests_ui --headed -k "ui02 or ui17"` opens Chrome and
+  you can watch it reject a gmail signup and send a friend request.
+
+---
+
 ## Git workflow (worth mentioning — version control is 25% of the grade)
 - Feature branches per task (`sa1-api-docs`, `sa2-auth`), merged into `dev`
   via pull requests. Teammates use the same flow (`setup-cezar`,
