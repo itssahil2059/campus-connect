@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -45,11 +46,29 @@ TAG_FILTERS = {"interest": "interests", "like": "likes", "dislike": "dislikes"}
 MAX_QUERY_LENGTH = 100
 
 
+def _years_before(today, years):
+    """The same day `years` years earlier (Feb 29 -> Feb 28 in non-leap years)."""
+    try:
+        return today.replace(year=today.year - years)
+    except ValueError:
+        return today.replace(year=today.year - years, day=28)
+
+
+def _int_param(params, name):
+    try:
+        return int(params.get(name, ""))
+    except ValueError:
+        return None  # missing or not a number -> ignore the filter
+
+
 def filter_profiles(queryset, params):
     """Narrow profiles by the search/filter query params (all ANDed together).
 
     ?q=        text in username, college or bio (case-insensitive)
     ?college=  text in college name
+    ?city=     text in city
+    ?gender=   exact gender value (e.g. "woman")
+    ?min_age= / ?max_age=   whole years, inclusive
     ?interest= / ?like= / ?dislike=   exact tag; repeat for "has all of these"
     """
     q = params.get("q", "").strip()[:MAX_QUERY_LENGTH]
@@ -63,6 +82,25 @@ def filter_profiles(queryset, params):
     college = params.get("college", "").strip()[:MAX_QUERY_LENGTH]
     if college:
         queryset = queryset.filter(user__college_name__icontains=college)
+
+    city = params.get("city", "").strip()[:MAX_QUERY_LENGTH]
+    if city:
+        queryset = queryset.filter(city__icontains=city)
+
+    gender = params.get("gender", "").strip()
+    if gender:
+        queryset = queryset.filter(gender=gender)
+
+    # Age filters become date-of-birth ranges, so the database does the work.
+    today = timezone.localdate()
+    min_age = _int_param(params, "min_age")
+    if min_age is not None:
+        # At least min_age: born on or before this day min_age years ago.
+        queryset = queryset.filter(date_of_birth__lte=_years_before(today, min_age))
+    max_age = _int_param(params, "max_age")
+    if max_age is not None:
+        # At most max_age: born after this day (max_age + 1) years ago.
+        queryset = queryset.filter(date_of_birth__gt=_years_before(today, max_age + 1))
 
     for param, field in TAG_FILTERS.items():
         # Tags are stored lowercased (see TagListField), so match that way.

@@ -53,3 +53,22 @@ def click_button(wait, text):
 
 def stored_token(browser):
     return browser.execute_script("return localStorage.getItem('token')")
+
+
+def set_date(browser, name, iso_date):
+    """Fill an <input type=date> with "YYYY-MM-DD".
+
+    Typing into Chrome's date picker depends on the computer's locale
+    (mm/dd/yyyy vs dd/mm/yyyy), so set the value the way React expects:
+    through the native value setter, then fire an "input" event.
+    """
+    field = browser.find_element(By.NAME, name)
+    browser.execute_script(
+        """
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+        setter.call(arguments[0], arguments[1]);
+        arguments[0].dispatchEvent(new Event("input", { bubbles: true }));
+        """,
+        field,
+        iso_date,
+    )

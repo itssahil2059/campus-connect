@@ -9,9 +9,24 @@ export interface User {
   isEduVerified: boolean;
 }
 
+export type Gender = "woman" | "man" | "non_binary" | "other" | "prefer_not_to_say";
+
+/** Same values and labels as Profile.Gender on the backend. */
+export const GENDER_OPTIONS: { value: Gender; label: string }[] = [
+  { value: "woman", label: "Woman" },
+  { value: "man", label: "Man" },
+  { value: "non_binary", label: "Non-binary" },
+  { value: "other", label: "Other" },
+  { value: "prefer_not_to_say", label: "Prefer not to say" },
+];
+
 export interface MyProfile {
   id: number;
   bio: string;
+  /** "YYYY-MM-DD". Private: other students only see `age`. */
+  dateOfBirth: string | null;
+  gender: Gender | "";
+  city: string;
   interests: string[];
   likes: string[];
   dislikes: string[];
@@ -25,6 +40,9 @@ export interface PublicProfile {
   username: string;
   collegeName: string;
   graduationYear: number | null;
+  age: number | null;
+  gender: Gender | "";
+  city: string;
   bio: string;
   interests: string[];
   likes: string[];
