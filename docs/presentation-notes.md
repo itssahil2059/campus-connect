@@ -542,6 +542,27 @@ and validated the Nginx config with `nginx -t` in Docker.
 
 ---
 
+## 14. Profile basics: date of birth, gender, city (branch `sa14-profile-basics`)
+- **New profile fields:** date of birth (required), gender and city
+  (optional). Migration `0004` adds them as nullable columns, so older
+  profiles keep working and get asked for a birthday on their next edit.
+- **Privacy:** other students see only the **age** worked out from the
+  date of birth, never the date. The public serializer doesn't include the
+  field at all, and a test checks that the year never appears in the response.
+- **18+ only:** the API rejects anyone under 18, future dates and anything
+  over 100. The date picker also blocks under-18 dates before sending
+  (`max` attribute), but the server check is the real one, because a
+  browser check can be bypassed.
+- **Search:** `?city=`, `?gender=`, `?min_age=`, `?max_age=`. Ages are
+  turned into a date-of-birth range ("at least 22" = born on or before
+  this day 22 years ago), so the database does the filtering in one query.
+- **Testing trick:** Chrome's date picker types differently per locale
+  (mm/dd vs dd/mm), so the Selenium helper `set_date` sets the value
+  through JavaScript the way React expects. Same result on any machine or CI.
+- **Tests:** 147 unit/API tests and 28 UI tests (new: UI-26 to UI-28).
+
+---
+
 ## Git workflow (worth mentioning — version control is 25% of the grade)
 - Feature branches per task (`sa1-api-docs`, `sa2-auth`), merged into `dev`
   via pull requests. Teammates use the same flow (`setup-cezar`,

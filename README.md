@@ -131,8 +131,8 @@ Admin site (users, profiles, questions, tokens): http://127.0.0.1:8000/admin/
 From `backend/` with the venv active:
 
 ```bash
-pytest                       # 130 unit/API tests (~25 s)
-pytest tests_ui              # 25 Selenium browser tests, headless Chrome (~35 s)
+pytest                       # 147 unit/API tests (~30 s)
+pytest tests_ui              # 28 Selenium browser tests, headless Chrome (~40 s)
 pytest tests_ui --headed     # same, but watch Chrome click through (HEADED=1 also works)
 pytest tests_ui -k ui05      # a single UI test by its ID
 ```

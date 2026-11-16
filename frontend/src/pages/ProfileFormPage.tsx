@@ -1,13 +1,21 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError, apiGet, apiPost, apiPut, errorMessage, fieldErrors } from "../api/client";
-import type { Answer, MyProfile, Question } from "../api/types";
+import { GENDER_OPTIONS, type Answer, type Gender, type MyProfile, type Question } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import LinksInput from "../components/LinksInput";
 import TagInput from "../components/TagInput";
-import { Alert, Button, Spinner } from "../components/ui";
+import { Alert, Button, Spinner, TextField } from "../components/ui";
 
 const BIO_MAX = 500;
+const MIN_AGE = 18; // matches the backend
+
+/** Latest allowed birthday (today, MIN_AGE years ago) as "YYYY-MM-DD", for the date picker. */
+function latestBirthday() {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - MIN_AGE);
+  return d.toISOString().slice(0, 10);
+}
 
 /** Used for both /profile/setup (first time) and /profile/edit. */
 export default function ProfileFormPage() {
@@ -17,6 +25,9 @@ export default function ProfileFormPage() {
 
   const [loading, setLoading] = useState(true);
   const [bio, setBio] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [gender, setGender] = useState<Gender | "">("");
+  const [city, setCity] = useState("");
   const [interests, setInterests] = useState<string[]>([]);
   const [likes, setLikes] = useState<string[]>([]);
   const [dislikes, setDislikes] = useState<string[]>([]);
@@ -38,6 +49,9 @@ export default function ProfileFormPage() {
       .then(([p, qs, as]) => {
         if (p) {
           setBio(p.bio);
+          setDateOfBirth(p.dateOfBirth ?? "");
+          setGender(p.gender);
+          setCity(p.city);
           setInterests(p.interests);
           setLikes(p.likes);
           setDislikes(p.dislikes);
@@ -58,6 +72,9 @@ export default function ProfileFormPage() {
     try {
       await apiPut("/api/profiles/me/", {
         bio,
+        dateOfBirth: dateOfBirth || null,
+        gender,
+        city,
         interests,
         likes,
         dislikes,
@@ -103,6 +120,50 @@ export default function ProfileFormPage() {
 
       <section className="space-y-5 rounded-3xl border border-line bg-white p-6 sm:p-8">
         <h2 className="font-display text-xl font-semibold">About you</h2>
+        <div className="grid gap-5 sm:grid-cols-3">
+          <TextField
+            label="Date of birth"
+            name="dateOfBirth"
+            type="date"
+            required
+            max={latestBirthday()}
+            value={dateOfBirth}
+            onChange={(e) => setDateOfBirth(e.target.value)}
+            error={errors.dateOfBirth}
+            hint="Only your age is shown."
+          />
+          <div className="space-y-1.5">
+            <label htmlFor="gender" className="block text-sm font-medium">
+              Gender <span className="font-normal text-muted">(optional)</span>
+            </label>
+            <select
+              id="gender"
+              name="gender"
+              value={gender}
+              onChange={(e) => setGender(e.target.value as Gender | "")}
+              className={`w-full rounded-xl border bg-white px-4 py-2.5 text-sm outline-none focus:border-ink ${
+                errors.gender ? "border-accent" : "border-line"
+              }`}
+            >
+              <option value="">Not set</option>
+              {GENDER_OPTIONS.map((g) => (
+                <option key={g.value} value={g.value}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
+            {errors.gender && <p className="text-sm text-accent-dark">{errors.gender}</p>}
+          </div>
+          <TextField
+            label="City (optional)"
+            name="city"
+            maxLength={100}
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            error={errors.city}
+            placeholder="e.g. Texarkana"
+          />
+        </div>
         <div className="space-y-1.5">
           <label htmlFor="bio" className="block text-sm font-medium">
             Bio

@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 // Small shared building blocks so every page looks consistent.
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import { GENDER_OPTIONS } from "../api/types";
 
 export function Button({
   variant = "primary",
@@ -129,4 +130,13 @@ export function shortTime(iso: string) {
     return date.toLocaleDateString([], { weekday: "short" });
   }
   return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+/** "21 · Woman · Texarkana": what's known of age, gender and city, or "". */
+export function basicsLine(p: { age: number | null; gender: string; city: string }) {
+  const gender =
+    p.gender && p.gender !== "prefer_not_to_say"
+      ? GENDER_OPTIONS.find((g) => g.value === p.gender)?.label
+      : null;
+  return [p.age, gender, p.city].filter(Boolean).join(" · ");
 }

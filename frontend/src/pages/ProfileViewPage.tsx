@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { apiGet, errorMessage } from "../api/client";
 import type { PublicProfile } from "../api/types";
 import ConnectButton from "../components/ConnectButton";
-import { Alert, Avatar, Chip, Spinner, classYear } from "../components/ui";
+import { Alert, Avatar, Chip, Spinner, basicsLine, classYear } from "../components/ui";
 
 /** /profile/:id — one student's full profile. */
 export default function ProfileViewPage() {
@@ -39,6 +39,11 @@ export default function ProfileViewPage() {
               <p className="mt-1 text-muted">
                 {[profile.collegeName, classYear(profile.graduationYear)].filter(Boolean).join(" · ")}
               </p>
+              {basicsLine(profile) && (
+                <p className="mt-0.5 text-sm text-muted" data-testid="profile-basics">
+                  {basicsLine(profile)}
+                </p>
+              )}
             </div>
             <div className="mt-6 sm:ml-auto sm:mt-0">
               <ConnectButton userId={profile.userId} />

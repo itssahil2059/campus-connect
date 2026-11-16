@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiGet, errorMessage } from "../api/client";
-import type { Connection, ConnectionWith, MyProfile, PublicProfile } from "../api/types";
+import { GENDER_OPTIONS, type Connection, type ConnectionWith, type MyProfile, type PublicProfile } from "../api/types";
 import ConnectButton from "../components/ConnectButton";
 import TagInput from "../components/TagInput";
 import {
@@ -10,6 +10,7 @@ import {
   Button,
   Chip,
   Spinner,
+  basicsLine,
   classYear,
 } from "../components/ui";
 
@@ -30,6 +31,8 @@ type Student = {
   name: string;
   college: string;
   classLabel: string | null;
+  /** "21 · Woman · Texarkana", or "" if not filled in. */
+  basics: string;
   bio: string;
   interests: string[];
   match: number;
@@ -42,6 +45,7 @@ const sampleStudents: Student[] = [
     name: "maya_patel",
     college: "Texas A&M University",
     classLabel: "Class of 2027",
+    basics: "",
     bio: "Always building side projects. Looking for people to hike and play board games with.",
     interests: ["Coding", "Hiking", "Board games"],
     match: 75,
@@ -52,6 +56,7 @@ const sampleStudents: Student[] = [
     name: "jordan_lee",
     college: "University of Texas at Austin",
     classLabel: "Class of 2028",
+    basics: "",
     bio: "Pre-med, early-morning runner, and a podcast addict.",
     interests: ["Running", "Cooking", "Podcasts"],
     match: 25,
@@ -62,6 +67,7 @@ const sampleStudents: Student[] = [
     name: "sofia_r",
     college: "Rice University",
     classLabel: "Class of 2026",
+    basics: "",
     bio: "Love live music and weekend art museum trips.",
     interests: ["Music", "Art", "Hiking"],
     match: 50,
@@ -95,6 +101,7 @@ function fromProfile(p: PublicProfile, mine: string[]): Student {
     classLabel: p.graduationYear
       ? classYear(p.graduationYear)
       : null,
+    basics: basicsLine(p),
     bio: p.bio ?? "",
     interests,
     match: calcMatch(mine, interests),
@@ -168,6 +175,10 @@ function StudentCard({
             <p className="text-xs text-muted/80">
               {student.classLabel}
             </p>
+          )}
+
+          {student.basics && (
+            <p className="text-xs text-muted/80">{student.basics}</p>
           )}
         </div>
 
@@ -251,6 +262,10 @@ export default function DiscoverPage() {
   const [interestTags, setInterestTags] = useState<string[]>([]);
   const [likeTags, setLikeTags] = useState<string[]>([]);
   const [dislikeTags, setDislikeTags] = useState<string[]>([]);
+  const [city, setCity] = useState("");
+  const [gender, setGender] = useState("");
+  const [minAge, setMinAge] = useState("");
+  const [maxAge, setMaxAge] = useState("");
   // null while the first search is loading.
   const [searchResults, setSearchResults] = useState<Student[] | null>(null);
   const [searchError, setSearchError] = useState("");
@@ -317,6 +332,10 @@ export default function DiscoverPage() {
     interestTags.forEach((tag) => params.append("interest", tag));
     likeTags.forEach((tag) => params.append("like", tag));
     dislikeTags.forEach((tag) => params.append("dislike", tag));
+    if (city.trim()) params.set("city", city.trim());
+    if (gender) params.set("gender", gender);
+    if (minAge) params.set("min_age", minAge);
+    if (maxAge) params.set("max_age", maxAge);
 
     // Ignore a response that arrives after the filters changed again.
     let stale = false;
@@ -341,7 +360,10 @@ export default function DiscoverPage() {
       stale = true;
       clearTimeout(timer);
     };
-  }, [isSearching, search, college, interestTags, likeTags, dislikeTags, students, myInterests]);
+  }, [
+    isSearching, search, college, interestTags, likeTags, dislikeTags,
+    city, gender, minAge, maxAge, students, myInterests,
+  ]);
 
   function clearSearch() {
     setSearch("");
@@ -349,6 +371,10 @@ export default function DiscoverPage() {
     setInterestTags([]);
     setLikeTags([]);
     setDislikeTags([]);
+    setCity("");
+    setGender("");
+    setMinAge("");
+    setMaxAge("");
   }
 
   // Suggested includes every student with a match of 20% or higher.
@@ -601,6 +627,37 @@ export default function DiscoverPage() {
                         >
                           Clear
                         </Button>
+                      </div>
+
+                      <div className="mt-4 grid gap-4 sm:grid-cols-4">
+                        <div className="space-y-1.5">
+                          <label htmlFor="search-city" className="block text-sm font-medium">City</label>
+                          <input id="search-city" name="search-city" value={city}
+                            onChange={(e) => setCity(e.target.value)} placeholder="e.g. Texarkana"
+                            className="w-full rounded-xl border border-line px-4 py-2.5 text-sm outline-none focus:border-ink" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label htmlFor="search-gender" className="block text-sm font-medium">Gender</label>
+                          <select id="search-gender" name="search-gender" value={gender}
+                            onChange={(e) => setGender(e.target.value)} className="w-full rounded-xl border border-line px-4 py-2.5 text-sm outline-none focus:border-ink">
+                            <option value="">Any</option>
+                            {GENDER_OPTIONS.filter((g) => g.value !== "prefer_not_to_say").map((g) => (
+                              <option key={g.value} value={g.value}>{g.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label htmlFor="search-min-age" className="block text-sm font-medium">Min age</label>
+                          <input id="search-min-age" name="search-min-age" type="number" min={18} max={100}
+                            value={minAge} onChange={(e) => setMinAge(e.target.value)} placeholder="18"
+                            className="w-full rounded-xl border border-line px-4 py-2.5 text-sm outline-none focus:border-ink" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label htmlFor="search-max-age" className="block text-sm font-medium">Max age</label>
+                          <input id="search-max-age" name="search-max-age" type="number" min={18} max={100}
+                            value={maxAge} onChange={(e) => setMaxAge(e.target.value)} placeholder="Any"
+                            className="w-full rounded-xl border border-line px-4 py-2.5 text-sm outline-none focus:border-ink" />
+                        </div>
                       </div>
 
                       <div className="mt-4 grid gap-4 sm:grid-cols-3">

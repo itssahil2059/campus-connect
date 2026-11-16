@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { apiGet, errorMessage } from "../api/client";
 import type { PublicProfile } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
-import { Alert, Avatar, Chip, Spinner, classYear } from "../components/ui";
+import { Alert, Avatar, Chip, Spinner, basicsLine, classYear } from "../components/ui";
 
 const MAX_CHIPS = 4;
 
@@ -67,6 +67,7 @@ function ProfileCard({ profile }: { profile: PublicProfile }) {
           {profile.graduationYear && (
             <p className="text-xs text-muted/80">{classYear(profile.graduationYear)}</p>
           )}
+          {basicsLine(profile) && <p className="text-xs text-muted/80">{basicsLine(profile)}</p>}
         </div>
       </div>
       {profile.bio && <p className="mt-4 line-clamp-3 text-sm text-ink/80">{profile.bio}</p>}

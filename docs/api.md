@@ -20,8 +20,8 @@ tested: build the frontend against those exactly.
 ## Profiles & questionnaire (Weeks 4–5)
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET / PUT | /api/profiles/me/ | My profile (`bio`, `interests`, `likes`, `dislikes`, `links`: up to 5 http(s) URLs) |
-| GET | /api/profiles/<id>/ | Another student's profile (includes `user_id`, used for connections and chat) |
+| GET / PUT | /api/profiles/me/ | My profile (`bio`, `date_of_birth` (required, 18+), `gender`, `city`, `interests`, `likes`, `dislikes`, `links`: up to 5 http(s) URLs) |
+| GET | /api/profiles/<id>/ | Another student's profile (includes `user_id`, used for connections and chat, and `age`, never `date_of_birth`) |
 | POST | /api/profiles/me/photo/ | Upload profile photo |
 | GET | /api/questions/ | Questionnaire questions |
 | GET / POST | /api/answers/ | My questionnaire answers |
@@ -30,7 +30,7 @@ tested: build the frontend against those exactly.
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | /api/discover/ | Suggested students, best match first |
-| GET | /api/profiles/?q=&college=&interest=&like=&dislike= | Search and filter (done; see below) |
+| GET | /api/profiles/?q=&college=&city=&gender=&min_age=&max_age=&interest=&like=&dislike= | Search and filter (done; see below) |
 | GET / POST | /api/connections/ | My connections and requests / send a request |
 | POST | /api/connections/<id>/accept/ | Accept a request |
 | POST | /api/connections/<id>/decline/ | Decline a request |
@@ -45,6 +45,9 @@ with AND, and blank ones are ignored.
 | --- | --- |
 | `q` | text in username, college or bio (case-insensitive, partial) |
 | `college` | text in college name (case-insensitive, partial) |
+| `city` | text in city (case-insensitive, partial) |
+| `gender` | exact value: `woman`, `man`, `non_binary`, `other`, `prefer_not_to_say` |
+| `min_age`, `max_age` | whole years, inclusive; non-numbers are ignored. Profiles without a date of birth never match an age filter |
 | `interest`, `like`, `dislike` | exact tag (case-insensitive); repeat a param to require all, e.g. `?interest=hiking&interest=coding` |
 
 Returns the same list as `GET /api/profiles/` (never yourself, only verified

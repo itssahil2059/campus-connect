@@ -1,10 +1,13 @@
 from django.core.validators import URLValidator
+from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Answer, Profile, Question
+from .models import Answer, Profile, Question, age_on
 
 MAX_TAGS = 15
 MAX_LINKS = 5
+MIN_AGE = 18  # dating features: adults only
+MAX_AGE = 100  # anything older is a typo
 
 
 class TagListField(serializers.ListField):
@@ -57,11 +60,29 @@ class MyProfileSerializer(serializers.ModelSerializer):
     likes = TagListField()
     dislikes = TagListField()
     links = LinkListField()
+    # Required on every save, so older profiles get it the next time they edit.
+    date_of_birth = serializers.DateField()
+    city = serializers.CharField(max_length=100, required=False, allow_blank=True, trim_whitespace=True)
 
     class Meta:
         model = Profile
-        fields = ["id", "bio", "interests", "likes", "dislikes", "links", "updated_at"]
+        fields = [
+            "id", "bio", "date_of_birth", "gender", "city",
+            "interests", "likes", "dislikes", "links", "updated_at",
+        ]
         read_only_fields = ["id", "updated_at"]
+        extra_kwargs = {"gender": {"required": False}}
+
+    def validate_date_of_birth(self, born):
+        today = timezone.localdate()
+        if born > today:
+            raise serializers.ValidationError("Date of birth can't be in the future.")
+        age = age_on(born, today)
+        if age < MIN_AGE:
+            raise serializers.ValidationError(f"You must be at least {MIN_AGE} to use Git Together.")
+        if age > MAX_AGE:
+            raise serializers.ValidationError("Please check your date of birth.")
+        return born
 
 
 class PublicProfileSerializer(serializers.ModelSerializer):
@@ -72,6 +93,8 @@ class PublicProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username")
     college_name = serializers.CharField(source="user.college_name")
     graduation_year = serializers.IntegerField(source="user.graduation_year")
+    # Age only, never the date of birth itself.
+    age = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Profile
@@ -81,6 +104,9 @@ class PublicProfileSerializer(serializers.ModelSerializer):
             "username",
             "college_name",
             "graduation_year",
+            "age",
+            "gender",
+            "city",
             "bio",
             "interests",
             "likes",
