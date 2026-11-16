@@ -136,7 +136,8 @@ python manage.py runserver
    email verification via `default_token_generator`. **Done, with pytest + Selenium tests.**
 2. Profile creation + preference quiz (incl. image upload via S3, and an
    "insert links" field). **Profile + questionnaire API and pages done, links
-   field done; image upload (S3) not yet.**
+   field done, date of birth (private, 18+) / gender / city done; image
+   upload (S3) not yet.**
 3. Suggested Interest / discovery feed — looser, randomized browse surface
    ("like YouTube subscriptions" per the team's own description).
 4. Search/Filter — precise narrowing (name, college, interests, likes/dislikes).
