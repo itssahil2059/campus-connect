@@ -176,5 +176,6 @@ deploy working after step 1 or 2 so it's not a last-week scramble.
   view are on dev; landing page "/" is Trinity's PR #5, tr1-home-page)
 - AWS deployment: **live since Oct 24 2026 at http://18.119.39.20** (EC2 + RDS,
   deployed from `dev` via `deploy/deploy.sh dev`). Still missing: SES for real
-  verification emails, domain + HTTPS. `/` is a frontend placeholder (Trinity's).
+  verification emails. Domain `datewithincampus.com` bought (GoDaddy,
+  Nov 18 2026); HTTPS config + guide in PR (docs/deploy.md, "Domain + HTTPS"). `/` is a frontend placeholder (Trinity's).
 - AI/chatbot feature — deliberately last, right before final submission

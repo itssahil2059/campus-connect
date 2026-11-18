@@ -196,6 +196,98 @@ Redis can stay installed; it's harmless.
 Costs: nothing new. Redis runs on the same EC2 instance (no ElastiCache),
 and WebSockets go through the existing Nginx (no load balancer).
 
+## Domain + HTTPS (datewithincampus.com)
+
+Puts the site on **https://datewithincampus.com** with a free Let's Encrypt
+certificate. Nginx does the encryption; Django and Daphne are unchanged.
+`deploy.sh` switches Nginx to `deploy/nginx-https.conf` by itself once the
+certificate exists, so a deploy can never undo HTTPS. Do the steps in order.
+
+**1. Check the IP won't change (AWS console).** EC2 → **Elastic IPs**: the
+site's IP (`18.119.39.20`) should be listed and associated with
+`gittogether-web`. If it isn't, allocate one and associate it first. A plain
+public IP changes when the instance stops, which would break the domain.
+
+**2. Open port 443 (AWS console).** EC2 → Security Groups → the server's group
+→ Edit inbound rules → **Add rule: HTTPS, port 443, source Anywhere-IPv4
+(0.0.0.0/0)**. Keep the HTTP (80) rule: Let's Encrypt and the redirect use it.
+
+**3. Point the domain at the server (GoDaddy).** My Products →
+datewithincampus.com → **DNS**:
+
+| Type | Name | Value | TTL |
+| --- | --- | --- | --- |
+| A | `@` | `18.119.39.20` | 600 seconds |
+| CNAME | `www` | `datewithincampus.com` | 1 hour |
+
+Delete any other `A` record for `@` (GoDaddy adds a "Parked" one) and turn
+off domain forwarding if it's on. Check from your laptop, it can take a few
+minutes up to an hour:
+
+```bash
+dig +short datewithincampus.com        # should print 18.119.39.20
+dig +short www.datewithincampus.com    # datewithincampus.com. + 18.119.39.20
+```
+
+**4. Deploy this code, then get the certificate (on the server).**
+
+```bash
+ssh -i ~/.ssh/gittogether-key.pem ubuntu@18.119.39.20
+~/campus-connect/deploy/deploy.sh dev        # adds the /.well-known/ path to Nginx
+sudo apt-get install -y certbot
+sudo certbot certonly --webroot -w /var/www/certbot \
+  -d datewithincampus.com -d www.datewithincampus.com \
+  --email <your email> --agree-tos --no-eff-email \
+  --deploy-hook "systemctl reload nginx"
+```
+
+Certbot should end with "Successfully received certificate". It renews by
+itself (a systemd timer runs twice a day; certificates last 90 days) and the
+hook reloads Nginx after each renewal. Test renewal with
+`sudo certbot renew --dry-run`.
+
+**5. Tell Django about the domain (on the server).** `nano ~/campus-connect/backend/.env`
+and set:
+
+```
+ALLOWED_HOSTS=datewithincampus.com,www.datewithincampus.com,18.119.39.20
+CSRF_TRUSTED_ORIGINS=https://datewithincampus.com,https://www.datewithincampus.com
+FRONTEND_URL=https://datewithincampus.com
+USE_HTTPS=True
+```
+
+`FRONTEND_URL` is where verification emails link to. `USE_HTTPS` makes
+Django mark cookies secure and treat the request as HTTPS.
+
+**6. Switch Nginx to HTTPS.** Run the deploy again; it now finds the
+certificate and installs `nginx-https.conf`:
+
+```bash
+~/campus-connect/deploy/deploy.sh dev        # prints "updated Nginx site (deploy/nginx-https.conf)"
+```
+
+**Check it worked** (from your laptop):
+
+```bash
+curl -sI http://datewithincampus.com | head -3     # 301 -> https://datewithincampus.com/
+curl -s -o /dev/null -w "%{http_code}\n" https://datewithincampus.com/api/auth/me/   # 401 = API OK
+```
+
+Then open https://datewithincampus.com, log in, and open a chat: the padlock
+should show, and messages should still arrive live (the app switches to
+secure WebSockets, `wss://`, on its own). Old `http://18.119.39.20` links now
+redirect to the domain.
+
+**Roll back** (if HTTPS breaks the site): on the server,
+`sudo cp ~/campus-connect/deploy/nginx.conf /etc/nginx/sites-available/gittogether && sudo systemctl reload nginx`,
+set `USE_HTTPS=False` and `FRONTEND_URL=http://18.119.39.20` in `backend/.env`,
+then `sudo systemctl restart gittogether`. (The next deploy switches back to
+HTTPS while the certificate exists; move it aside with
+`sudo mv /etc/letsencrypt/live/datewithincampus.com ~/cert-backup` to stop that.)
+
+Costs: none from AWS (same server and IP; certificates are free). The domain
+is billed by GoDaddy.
+
 ## Handy commands (on the server)
 
 | What | Command |

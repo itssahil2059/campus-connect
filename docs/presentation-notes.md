@@ -563,6 +563,31 @@ and validated the Nginx config with `nginx -t` in Docker.
 
 ---
 
+## 15. Domain + HTTPS: datewithincampus.com (Nov 18, 2026)
+
+**What was done**
+- Bought `datewithincampus.com` (GoDaddy). Added an HTTPS Nginx site
+  (`deploy/nginx-https.conf`) with a free Let's Encrypt certificate; plain
+  HTTP redirects to `https://datewithincampus.com`.
+- The app part of the Nginx config moved to `deploy/nginx-app.conf`, shared
+  by the HTTP and HTTPS sites, so routes are defined once.
+- `deploy.sh` picks the HTTPS site automatically once the certificate exists.
+  Step-by-step guide: `docs/deploy.md`, "Domain + HTTPS".
+
+**Talking points**
+- *Why HTTPS matters here:* "Users log in and send private messages. Without
+  HTTPS, anyone on the same campus Wi-Fi could read the login token. Now
+  everything, including the live chat WebSocket, is encrypted."
+- *Where encryption happens:* "Nginx handles the certificate and encryption,
+  then passes requests to Django on the same machine. Django gets a header
+  saying the request was HTTPS, so it marks cookies secure."
+- *Why the deploy script chooses the config:* "Certbot normally edits the
+  Nginx file by hand, and our deploy script copies the file from git on every
+  deploy, so it would undo HTTPS. Keeping both versions in git and letting
+  the script choose makes the server reproducible from the repo."
+
+---
+
 ## Git workflow (worth mentioning — version control is 25% of the grade)
 - Feature branches per task (`sa1-api-docs`, `sa2-auth`), merged into `dev`
   via pull requests. Teammates use the same flow (`setup-cezar`,
@@ -575,7 +600,7 @@ and validated the Nginx config with `nginx -t` in Docker.
 ---
 
 ## Possible demo script (fill in as features land)
-1. Open http://18.119.39.20/signup (live) or http://localhost:5173/signup and try a `@gmail.com` address → error
+1. Open https://datewithincampus.com/signup (live) or http://localhost:5173/signup and try a `@gmail.com` address → error
    under the email field.
 2. Sign up with a `.edu` address → "Check your inbox" page.
 3. Copy the link from the Django terminal and open it → "You're verified".
