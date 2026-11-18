@@ -1,195 +1,97 @@
-# Git Together (working title: Campus Connect)
+# Git Together
 
 [![CI](https://github.com/itssahil2059/campus-connect/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/itssahil2059/campus-connect/actions/workflows/ci.yml)
 
-A social hub for verified college students. Sign up with a `.edu` email, verify
-it, build a profile and answer a short preference questionnaire, then browse
-other verified students.
+A social hub for verified college students. Only students with a `.edu` email
+can join, and they must verify it. Students build a profile, answer a short
+preference questionnaire, find each other through Discover and search,
+connect as friends, and chat in real time.
 
-CS 495 Capstone, Texas A&M University–Texarkana, Fall 2026 — team **Git
-Together** (see [TEAM.md](TEAM.md)).
+CS 495 Capstone, Texas A&M University–Texarkana, Fall 2026. Team **Git
+Together** ([TEAM.md](TEAM.md)).
 
-## What works today
+**Live site:** http://18.119.39.20
 
-Signup (`.edu` only) → email verification link → login → profile + preference
-questionnaire → Home feed of other students → single profile view.
+## Features
+
+| Area | What it does |
+| --- | --- |
+| Sign up and verification | `.edu` emails only, one account per email; a verification link must be opened before the first login |
+| Login | Token login and logout; private pages redirect to login |
+| Profile | Bio, interests, likes, dislikes, up to 5 links, age, gender, city. Date of birth is required (18+) but kept private: others only see the age |
+| Questionnaire | Multiple-choice preference questions, saved to the account and editable later |
+| Home feed | Other verified students (never yourself) |
+| Discover | Browse everyone, see your friends, and search |
+| Search and filter | Keyword search plus filters for college, city, gender, age range, interests, likes and dislikes |
+| Friends | Send, accept, decline, cancel and remove friend requests; your connections are private |
+| Messages | Private one-to-one chats between friends, delivered live over WebSockets, with unread badges and read receipts |
+
+## Tech stack
 
 | Part | Tech |
 | --- | --- |
-| Backend API | Django 5 + Django REST Framework, token auth |
-| Database | PostgreSQL 16 (Docker for local dev) |
-| Realtime (later, for chat) | Redis 7 (Docker) + Django Channels |
-| Frontend | React + Vite + TypeScript + Tailwind |
-| Tests | pytest + pytest-django (API), Selenium (UI automation) |
+| Backend API | Python, Django 5, Django REST Framework (token auth) |
+| Realtime chat | Django Channels + Redis |
+| Database | PostgreSQL 16 |
+| Frontend | React, Vite, TypeScript, Tailwind CSS |
+| Hosting | AWS EC2 (Nginx + Daphne) and AWS RDS (PostgreSQL) |
+| Tests | pytest + pytest-django (unit/API), Selenium (UI automation) |
+| CI | GitHub Actions on every pull request |
 
-API endpoints: [docs/api.md](docs/api.md).
+## Tests
 
-## Repo layout
+| Suite | Tests | Command (from `backend/`) |
+| --- | --- | --- |
+| Unit + API (pytest) | 147 | `pytest` |
+| UI automation (Selenium, Chrome) | 28 | `pytest tests_ui` |
+| **Total** | **175** | |
 
-```
-campus-connect/
-  backend/
-    core/        Django project: settings, URLs
-    users/       Accounts: signup, email verification, login/logout, /me
-    profiles/    Profiles + questionnaire (Question/Answer), seed_demo command
-    tests_ui/    Selenium browser tests
-  frontend/      React app (pages in src/pages, shared UI in src/components)
-  deploy/        EC2 server config: Nginx, gunicorn service, setup + deploy scripts
-  docs/          API list, deployment guide, presentation notes
-  docker-compose.yml   Postgres + Redis for local dev
-```
+Every test case, with its steps, expected result and the project task it
+covers, is listed in [docs/test-cases.md](docs/test-cases.md). Add
+`--headed` to watch Chrome run the UI tests.
 
----
+## Running it locally
 
-## First-time setup
-
-### 1. Install prerequisites
-
-- **Python 3.11+** — check with `python3 --version`
-- **Node.js 22+** (or 20.19+) — check with `node --version`
-- **Docker Desktop** — https://www.docker.com/products/docker-desktop/
-- **Google Chrome** — only needed for the UI tests
-
-### 2. Get the code
+You need Python 3.11+, Node.js 20.19+, Docker Desktop and Google Chrome (for
+the UI tests).
 
 ```bash
-git clone https://github.com/itssahil2059/campus-connect.git
-cd campus-connect
-```
+docker compose up -d db redis                  # Postgres + Redis
 
-### 3. Start the database (Postgres + Redis)
-
-Open **Docker Desktop** first and wait until it says "Engine running", then:
-
-```bash
-docker compose up -d db redis
-docker compose ps        # both should say "Up"
-```
-
-### 4. Backend setup
-
-```bash
 cd backend
-python3 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env               # defaults already match docker-compose
-python manage.py migrate           # creates tables + the starter questionnaire
-python manage.py seed_demo         # optional: 6 sample students for the Home feed
-python manage.py createsuperuser   # optional: login for the admin site
-```
+cp .env.example .env
+python manage.py migrate
+python manage.py runserver                     # API on http://127.0.0.1:8000
 
-### 5. Frontend setup
-
-In a **second terminal**:
-
-```bash
-cd frontend
+cd ../frontend                                 # in a second terminal
 npm install
+npm run dev                                    # app on http://localhost:5173
 ```
 
----
+In local development the verification email is printed in the `runserver`
+terminal instead of being sent. Full setup, troubleshooting and the team's git
+workflow are in [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
-## Running the app
+## Project layout
 
-You need **two terminals** (plus Docker running).
-
-**Terminal 1 — backend** (http://127.0.0.1:8000)
-
-```bash
-cd backend
-source .venv/bin/activate
-python manage.py runserver
+```
+backend/
+  core/          Django settings and URLs
+  users/         Accounts: signup, email verification, login/logout
+  profiles/      Profiles, questionnaire, search
+  connections/   Friend requests and connections
+  chat/          Conversations, messages, WebSocket consumer
+  tests_ui/      Selenium UI tests
+frontend/        React app (pages in src/pages, shared UI in src/components)
+deploy/          EC2 server config and deploy script
+docs/            API reference, deployment guide, test cases
 ```
 
-**Terminal 2 — frontend** (http://localhost:5173)
+## Documentation
 
-```bash
-cd frontend
-npm run dev
-```
-
-Then open **http://localhost:5173/signup**.
-
-### Trying the full flow
-
-1. Sign up with any address ending in `.edu` (it doesn't have to be real).
-2. **No real email is sent in local dev.** The verification email, including
-   the link, is printed in **Terminal 1**. Copy the link
-   (`http://localhost:5173/verify/...`) into your browser.
-3. Log in → you'll land on profile setup the first time → fill it in → Home.
-
-Shortcut: after `seed_demo`, you can log in as any sample student, e.g.
-`maya@tamut.edu` / `demo-Pass-2026`.
-
-Admin site (users, profiles, questions, tokens): http://127.0.0.1:8000/admin/
-
----
-
-## Running the tests
-
-From `backend/` with the venv active:
-
-```bash
-pytest                       # 147 unit/API tests (~30 s)
-pytest tests_ui              # 28 Selenium browser tests, headless Chrome (~40 s)
-pytest tests_ui --headed     # same, but watch Chrome click through (HEADED=1 also works)
-pytest tests_ui -k ui05      # a single UI test by its ID
-```
-
-- Every test case is listed in [docs/test-cases.md](docs/test-cases.md).
-- CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs pytest, the
-  frontend lint + build and the Selenium tests on every pull request and on
-  pushes to `dev`/`main`.
-- `scripts/make-testcases-zip.sh` builds `GitTogether_testcases.zip` (the
-  tests + docs/test-cases.md) for the P8 submission.
-
-- Tests use a separate throwaway database, so your local data is never touched.
-- The UI tests start their own backend and frontend servers (frontend on
-  port **5174**), so you don't need anything running except Docker. Run
-  `npm install` in `frontend/` first.
-
----
-
-## Deployment (AWS)
-
-The live site runs on one **EC2** server (Nginx + gunicorn) with an **RDS**
-Postgres database. Step-by-step guide: [docs/deploy.md](docs/deploy.md).
-Code goes live from the `main` branch: `deploy/deploy.sh` on the server
-pulls, migrates, rebuilds the frontend, and restarts Django.
-
----
-
-## Day-to-day
-
-- New terminal? `cd backend && source .venv/bin/activate`
-- Docker Desktop must be running, and `docker compose up -d db redis` once per reboot.
-- Pulled new code? Run `pip install -r requirements.txt`, `python manage.py migrate`,
-  and `npm install` in `frontend/` in case dependencies or the schema changed.
-- Changed a model? `python manage.py makemigrations`, then commit the migration
-  file **in the same commit** as the model change.
-
-### Git workflow
-
-- Never commit directly to `main` or `dev`. One branch per task:
-  ```bash
-  git switch dev && git pull
-  git switch -c <initials><number>-<short-name>   # e.g. sa3-profiles
-  ```
-- Commit after every working step, with a message that says what and why.
-- `git push -u origin <branch>` the first time, then just `git push`.
-- Open a pull request into **`dev`** on GitHub when the task is done.
-- Never commit `backend/.env` (it holds secrets; it's already git-ignored).
-
----
-
-## Troubleshooting
-
-| Problem | Fix |
-| --- | --- |
-| `failed to connect to the docker API` | Docker Desktop isn't running — open it and wait. |
-| `connection refused` on port 5432 when running Django | `docker compose up -d db redis` from the repo root. |
-| Frontend says "Can't reach the server" | Terminal 1 (`runserver`) isn't running. |
-| Login says "Please verify your email" | Open the verification link printed in Terminal 1. |
-| Verification link says invalid/expired | Links expire after 3 days and stop working after your first login — sign up again with a new email. |
-| `port 5174 is already in use` (UI tests) | Another Vite server is on 5174 — stop it and rerun. |
+- [API reference](docs/api.md)
+- [Test cases](docs/test-cases.md)
+- [Deployment guide (AWS)](docs/deploy.md)
+- [Developer guide](docs/CONTRIBUTING.md)
