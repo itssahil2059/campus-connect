@@ -27,7 +27,7 @@ fi
 
 echo "==> System packages (Python, Nginx, Postgres client, Redis for chat)"
 sudo apt-get update -y
-sudo apt-get install -y python3-venv python3-dev build-essential nginx postgresql-client git curl redis-server
+sudo apt-get install -y python3-venv python3-dev build-essential nginx postgresql-client git curl redis-server certbot
 
 echo "==> Node.js 22 (Ubuntu's own Node is too old for Vite)"
 if ! command -v node >/dev/null || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 22 ]; then
@@ -43,6 +43,7 @@ chmod o+x "$HOME"
 
 echo "==> Install the Daphne service and the Nginx site"
 sudo cp deploy/gittogether.service /etc/systemd/system/gittogether.service
+sudo mkdir -p /var/www/certbot   # Let's Encrypt challenge files (HTTPS setup)
 sudo cp deploy/nginx.conf /etc/nginx/sites-available/gittogether
 sudo ln -sf /etc/nginx/sites-available/gittogether /etc/nginx/sites-enabled/gittogether
 sudo rm -f /etc/nginx/sites-enabled/default

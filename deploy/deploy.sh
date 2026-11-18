@@ -36,11 +36,19 @@ main() {
     sudo systemctl daemon-reload
     echo "    updated gittogether.service"
   fi
-  if ! cmp -s deploy/nginx.conf /etc/nginx/sites-available/gittogether; then
-    sudo cp deploy/nginx.conf /etc/nginx/sites-available/gittogether
-    sudo nginx -t && sudo systemctl reload nginx
-    echo "    updated Nginx site"
+  # HTTPS config once the Let's Encrypt certificate exists, plain HTTP before.
+  SITE=deploy/nginx.conf
+  if sudo test -f /etc/letsencrypt/live/datewithincampus.com/fullchain.pem; then
+    SITE=deploy/nginx-https.conf
   fi
+  sudo mkdir -p /var/www/certbot
+  if ! cmp -s "$SITE" /etc/nginx/sites-available/gittogether; then
+    sudo cp "$SITE" /etc/nginx/sites-available/gittogether
+    echo "    updated Nginx site ($SITE)"
+  fi
+  # Always reload: nginx-app.conf is included from the repo, so a change
+  # there doesn't show up as a change to the site file.
+  sudo nginx -t && sudo systemctl reload nginx
 
   echo "==> Restarting the API"
   sudo systemctl restart gittogether
