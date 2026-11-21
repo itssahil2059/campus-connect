@@ -1,4 +1,5 @@
 import pytest
+from django.core.cache import cache
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
@@ -15,6 +16,12 @@ def pytest_addoption(parser):
         help="UI tests: show the Chrome window instead of running headless "
         "(same as HEADED=1).",
     )
+
+
+@pytest.fixture(autouse=True)
+def clear_throttle_counts():
+    """Rate-limit counters live in the cache; start every test fresh."""
+    cache.clear()
 
 
 @pytest.fixture

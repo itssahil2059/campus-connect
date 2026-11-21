@@ -1,16 +1,36 @@
+import logging
+import smtplib
+
 from django.contrib.auth.models import update_last_login
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
 from django.utils.encoding import force_str
+from django.db import transaction
 from django.utils.http import urlsafe_base64_decode
 from rest_framework import generics, permissions, status
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from .emails import send_verification_email
 from .models import CustomUser
-from .serializers import LoginSerializer, SignupSerializer, UserSelfSerializer
+from .serializers import (
+    LoginSerializer,
+    ResendVerificationSerializer,
+    SignupSerializer,
+    UserSelfSerializer,
+)
+
+logger = logging.getLogger(__name__)
+
+# What a failed send raises: SMTP errors, plus OSError for timeouts and
+# refused connections.
+EMAIL_ERRORS = (smtplib.SMTPException, OSError)
+EMAIL_FAILED = (
+    "We couldn't send the verification email right now. "
+    "Please try again in a few minutes."
+)
 
 
 class SignupView(generics.CreateAPIView):
@@ -28,8 +48,19 @@ class SignupView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        send_verification_email(user)
+        # Save and send together: if the email can't be sent, the new account
+        # is rolled back, so the student can simply try again instead of being
+        # stuck with an account they can never verify.
+        try:
+            with transaction.atomic():
+                user = serializer.save()
+                send_verification_email(user)
+        except EMAIL_ERRORS:
+            logger.exception("Verification email failed at signup")
+            return Response(
+                {"detail": EMAIL_FAILED},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         # Respond with the public serializer, not SignupSerializer, so nothing
         # password-related is echoed back. No token yet: the user has to
@@ -72,6 +103,42 @@ class VerifyEmailView(APIView):
         user.is_edu_verified = True
         user.save(update_fields=["is_active", "is_edu_verified"])
         return Response({"detail": "Email verified. You can now log in."})
+
+
+class ResendVerificationView(APIView):
+    """POST /api/auth/resend-verification/ — email a new verification link.
+
+    Always gives the same answer, whether or not the email has an account,
+    so it can't be used to find out who has signed up.
+    """
+
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "resend_verification"
+
+    def post(self, request):
+        serializer = ResendVerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["school_email"]
+
+        user = CustomUser.objects.filter(
+            school_email__iexact=email, is_edu_verified=False
+        ).first()
+        if user is not None:
+            try:
+                send_verification_email(user)
+            except EMAIL_ERRORS:
+                logger.exception("Verification email failed on resend")
+                return Response(
+                    {"detail": EMAIL_FAILED},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+
+        return Response(
+            {"detail": "If that account exists and isn't verified yet, "
+                       "we've sent a new link."}
+        )
 
 
 class LoginView(APIView):

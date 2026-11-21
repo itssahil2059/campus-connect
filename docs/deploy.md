@@ -288,6 +288,90 @@ HTTPS while the certificate exists; move it aside with
 Costs: none from AWS (same server and IP; certificates are free). The domain
 is billed by GoDaddy.
 
+## Real email (AWS SES)
+
+Sends the real verification emails from `no-reply@datewithincampus.com`
+through **Amazon SES** (Simple Email Service). Django talks to SES over
+SMTP, so there's no new Python package and no code change: only settings.
+Do everything in the **same region as the server, us-east-2 (Ohio)**.
+
+**1. Verify the domain (SES console + GoDaddy).**
+SES → **Identities → Create identity → Domain** → `datewithincampus.com`.
+Leave "Easy DKIM", RSA 2048-bit, checked. Create it. SES shows **3 CNAME
+records**. Add each in GoDaddy → DNS → **Add New Record → CNAME**:
+
+- **Name:** only the part before `.datewithincampus.com`
+  (e.g. `abc123._domainkey`). GoDaddy adds the domain itself.
+- **Value:** the full value SES shows (ends in `dkim.amazonses.com`).
+
+Also add this TXT record. It tells Gmail/Outlook what to do with mail that
+fails the checks, and helps keep our emails out of spam:
+
+| Type | Name | Value |
+| --- | --- | --- |
+| TXT | `_dmarc` | `v=DMARC1; p=none;` |
+
+Within about an hour the identity shows **Verified** and DKIM **Successful**.
+(DKIM = a signature on every email proving it really came from our domain.)
+
+**2. Sandbox: verify your own address to test.** New SES accounts start in
+the *sandbox*: they can only send to addresses you've verified, max 200 a day.
+SES → **Identities → Create identity → Email address** → your school email →
+click the link SES sends you. Add teammates' emails the same way for demos.
+
+**3. Ask for production access** (so any student can get an email).
+SES → **Account dashboard → Request production access**:
+
+- Mail type: **Transactional**
+- Website URL: `https://datewithincampus.com`
+- Use case description (you can paste this):
+  > Git Together is a student project (CS 495 Capstone, Texas A&M
+  > University–Texarkana) at https://datewithincampus.com. We only send
+  > one transactional email: the verification link a student requests when
+  > signing up with their .edu address, or when they ask for the link again
+  > (limited to 5 per hour). No marketing or bulk email. Expected volume is
+  > under 100 emails a day. Addresses come only from students who sign up
+  > themselves. Bounces and complaints are watched in the SES console, and
+  > signups are limited to .edu addresses.
+
+AWS usually answers within a day. Until then the sandbox still works for
+your verified addresses.
+
+**4. Create SMTP credentials.** SES → **SMTP settings → Create SMTP
+credentials**. This makes an IAM user that can only send email. **Download
+the credentials now**: the password is shown once. (The SMTP password is
+not the same as an IAM secret key; use the SMTP one.)
+
+**5. Put them on the server.** `nano ~/campus-connect/backend/.env`:
+
+```
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=email-smtp.us-east-2.amazonaws.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=<SMTP username from step 4>
+EMAIL_HOST_PASSWORD=<SMTP password from step 4>
+DEFAULT_FROM_EMAIL=Git Together <no-reply@datewithincampus.com>
+```
+
+Then `~/campus-connect/deploy/deploy.sh dev` (restarts Django with the new settings).
+
+**6. Test it.**
+
+```bash
+cd ~/campus-connect/backend
+.venv/bin/python manage.py sendtestemail <your verified email>
+```
+
+It should arrive within a minute. Then sign up for real on
+https://datewithincampus.com. If it fails, `journalctl -u gittogether -n 50`
+shows the reason (e.g. `Email address is not verified` = still in the sandbox
+and that address isn't verified; `535 Authentication Credentials Invalid` =
+wrong SMTP username/password). If sending fails, signup now shows "We
+couldn't send the verification email" and doesn't create the account.
+
+Costs: SES charges $0.10 per 1,000 emails, covered by the Free Plan credits.
+
 ## Handy commands (on the server)
 
 | What | Command |

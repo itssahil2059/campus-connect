@@ -27,7 +27,7 @@ The UI tests start everything they need on their own: a throwaway Django server
 on an empty test database, the React dev server pointed at it (port 5174),
 and Chrome. CI runs both suites on every pull request (`.github/workflows/ci.yml`).
 
-## UI test cases (Selenium) — 28 tests
+## UI test cases (Selenium) — 29 tests
 
 Every test starts logged out with an empty database and creates only the data
 it needs. "Steps" are what the browser does; "Expected" is the main check.
@@ -44,6 +44,7 @@ Files are in `backend/tests_ui/`.
 | UI-05 | `test_ui05_verification_link_activates_account` | Email verification link | Unverified account exists; open its `/verify/<uid>/<token>` link | Page says "verified"; account becomes active and .edu-verified | T2 Registration/Authentication |
 | UI-06 | `test_ui06_login_with_wrong_password_shows_error` | Wrong password is refused | Log in with the right email and a wrong password | Alert "Invalid email or password."; still on `/login` | T2 Registration/Authentication |
 | UI-07 | `test_ui07_unverified_user_cannot_log_in` | Verification is required before login | Unverified account; log in with the right password | Alert "Please verify your email before logging in." | T2 Registration/Authentication |
+| UI-29 | `test_ui29_unverified_user_can_resend_verification_email` | Getting a new verification link | Unverified account; log in; click **Resend the link** in the alert, then **Resend the email** | Confirmation message shown; a new verification email is sent to the account | T2 Registration/Authentication |
 | UI-08 | `test_ui08_first_login_goes_to_profile_setup` | New users are sent to build a profile | Verified account with no profile; log in | URL becomes `/profile/setup` | T2 Registration/Authentication / T3 Profile Creation |
 | UI-09 | `test_ui09_successful_login_lands_on_home` | Successful login | Verified account with a profile; log in | Home shows "Hey, alice"; a login token is stored | T2 Registration/Authentication |
 | UI-10 | `test_ui10_logged_out_visitor_is_redirected_to_login` | Private pages need login | Logged out, open `/home` | Redirected to `/login` | T2 Registration/Authentication |
@@ -85,26 +86,26 @@ Files are in `backend/tests_ui/`.
 | T6 Discovery Page | Refresh capability | Not built |
 | T9 Private Messages | Send and view images/videos (links work as text) | Not built |
 
-## Unit and API tests (pytest) — 147 tests
+## Unit and API tests (pytest) — 155 tests
 
 These call the Django API directly through DRF's test client (no browser), so
 they're fast and cover edge cases the UI tests don't.
 
 | App | File | Tests | What they cover |
 | --- | --- | --- | --- |
-| users | `users/tests/test_views.py` | 34 | Signup validation (.edu only, duplicates in any case, password rules, college required); verification links (tampered/foreign/old tokens rejected, link dies after first login); login/logout/me, token reuse and revocation, one generic error for bad credentials |
+| users | `users/tests/test_views.py` | 42 | Signup validation (.edu only, duplicates in any case, password rules, college required); verification links (tampered/foreign/old tokens rejected, link dies after first login); login/logout/me, token reuse and revocation, one generic error for bad credentials; signup rolled back if the email can't be sent; resend link (works, same answer for unknown/verified emails, 503 on failure, rate limit) |
 | profiles | `profiles/tests/test_views.py` | 51 | Create/update own profile; date of birth required, 18+ only, no future/impossible dates; gender choices; city; public profiles show age, never the birth date; tag cleaning and limits; links (http(s) only, max 5, https added); public profiles hide email and exclude yourself and unverified users; questionnaire answers (save, replace, invalid choice rejected, private); search/filter params incl. city, gender and age range (parametrized tables) |
 | connections | `connections/tests/test_models.py` | 5 | One row per pair, no self-connections, status from each side |
 | connections | `connections/tests/test_views.py` | 20 | Send/accept/decline/cancel/remove requests; privacy (others can't see your connections); declined senders can't resend |
 | chat | `chat/tests/test_models.py` | 8 | One conversation per pair; only participants can send; no sending after disconnect; read receipts |
 | chat | `chat/tests/test_views.py` | 17 | Starting a chat requires an accepted connection; chat list and unread counts; message history paging; blank/too-long messages rejected; rate limiting |
 | chat | `chat/tests/test_consumers.py` | 12 | WebSocket chat: login required, only participants can join, other-site origins rejected, live delivery to both sides, invalid messages get errors, read receipts |
-| **Total** | | **147** | |
+| **Total** | | **155** | |
 
 ## Totals
 
 | Suite | Tests | Command |
 | --- | --- | --- |
-| Unit + API (pytest) | 147 | `pytest` |
-| UI automation (Selenium) | 28 | `pytest tests_ui` |
-| **All** | **175** | |
+| Unit + API (pytest) | 155 | `pytest` |
+| UI automation (Selenium) | 29 | `pytest tests_ui` |
+| **All** | **184** | |

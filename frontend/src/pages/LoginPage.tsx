@@ -46,7 +46,23 @@ export default function LoginPage() {
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        {formError && !Object.keys(errors).length && <Alert>{formError}</Alert>}
+        {formError && !Object.keys(errors).length && (
+          <Alert>
+            {formError}
+            {formError.startsWith("Please verify") && (
+              <>
+                {" "}
+                <Link
+                  to="/check-email"
+                  state={{ email: form.schoolEmail.trim().toLowerCase() }}
+                  className="font-medium underline underline-offset-4"
+                >
+                  Resend the link
+                </Link>
+              </>
+            )}
+          </Alert>
+        )}
         <TextField label="School email" name="schoolEmail" type="email" value={form.schoolEmail}
           onChange={(e) => setForm({ ...form, schoolEmail: e.target.value })}
           error={errors.schoolEmail} placeholder="you@school.edu" autoComplete="email" required />

@@ -335,3 +335,72 @@ class TestLoginLogoutMe:
 
     def test_logout_requires_login(self, api_client):
         assert api_client.post(self.LOGOUT_URL).status_code == 401
+
+
+RESEND_URL = reverse("users:resend-verification")
+
+
+def broken_mail(monkeypatch):
+    """Make every email send fail like an unreachable mail server would."""
+
+    def fail(*args, **kwargs):
+        raise ConnectionRefusedError("mail server down")
+
+    monkeypatch.setattr("users.emails.send_mail", fail)
+
+
+@pytest.mark.django_db
+class TestSignupEmailFailure:
+    def test_failed_email_rolls_back_the_account(self, api_client, monkeypatch):
+        broken_mail(monkeypatch)
+        res = api_client.post(SIGNUP_URL, signup_data(), format="json")
+        assert res.status_code == 503
+        assert "couldn't send" in res.data["detail"]
+        assert not CustomUser.objects.exists()
+
+    def test_can_sign_up_again_once_email_works(self, api_client, monkeypatch, mailoutbox):
+        broken_mail(monkeypatch)
+        api_client.post(SIGNUP_URL, signup_data(), format="json")
+        monkeypatch.undo()
+        res = api_client.post(SIGNUP_URL, signup_data(), format="json")
+        assert res.status_code == 201
+        assert len(mailoutbox) == 1
+
+
+@pytest.mark.django_db
+class TestResendVerification:
+    def test_sends_a_new_working_link(self, api_client, make_user, mailoutbox):
+        make_user(is_active=False)
+        res = api_client.post(RESEND_URL, {"school_email": "ALICE@tamut.edu"}, format="json")
+        assert res.status_code == 200
+        assert len(mailoutbox) == 1
+        assert mailoutbox[0].to == ["alice@tamut.edu"]
+        path = re.search(r"/verify/(\S+)/(\S+)", mailoutbox[0].body)
+        assert api_client.get(verify_url(*path.groups())).status_code == 200
+
+    @pytest.mark.parametrize("case", ["unknown", "verified"])
+    def test_same_answer_and_no_email_when_nothing_to_send(
+        self, api_client, make_user, mailoutbox, case
+    ):
+        if case == "verified":
+            make_user(is_edu_verified=True)
+        res = api_client.post(RESEND_URL, {"school_email": "alice@tamut.edu"}, format="json")
+        assert res.status_code == 200
+        assert res.data["detail"].startswith("If that account exists")
+        assert mailoutbox == []
+
+    def test_rejects_invalid_email(self, api_client):
+        res = api_client.post(RESEND_URL, {"school_email": "not-an-email"}, format="json")
+        assert res.status_code == 400
+
+    def test_failed_send_returns_503(self, api_client, make_user, monkeypatch):
+        make_user(is_active=False)
+        broken_mail(monkeypatch)
+        res = api_client.post(RESEND_URL, {"school_email": "alice@tamut.edu"}, format="json")
+        assert res.status_code == 503
+
+    def test_rate_limited_to_five_per_hour(self, api_client, make_user):
+        make_user(is_active=False)
+        body = {"school_email": "alice@tamut.edu"}
+        codes = [api_client.post(RESEND_URL, body, format="json").status_code for _ in range(6)]
+        assert codes == [200] * 5 + [429]
