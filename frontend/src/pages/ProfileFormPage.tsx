@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ApiError, apiGet, apiPost, apiPut, errorMessage, fieldErrors } from "../api/client";
 import { GENDER_OPTIONS, type Answer, type Gender, type MyProfile, type Question } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import LinksInput from "../components/LinksInput";
+import PhotoUpload from "../components/PhotoUpload";
 import TagInput from "../components/TagInput";
 import { Alert, Button, Spinner, TextField } from "../components/ui";
 
@@ -24,6 +25,9 @@ export default function ProfileFormPage() {
   const isSetup = useLocation().pathname === "/profile/setup";
 
   const [loading, setLoading] = useState(true);
+  // Null until the profile exists (first setup): photos need a profile.
+  const [profileId, setProfileId] = useState<number | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [bio, setBio] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [gender, setGender] = useState<Gender | "">("");
@@ -48,6 +52,8 @@ export default function ProfileFormPage() {
     Promise.all([profile, apiGet<Question[]>("/api/questions/"), apiGet<Answer[]>("/api/answers/")])
       .then(([p, qs, as]) => {
         if (p) {
+          setProfileId(p.id);
+          setPhotoUrl(p.photoUrl);
           setBio(p.bio);
           setDateOfBirth(p.dateOfBirth ?? "");
           setGender(p.gender);
@@ -113,6 +119,14 @@ export default function ProfileFormPage() {
           {isSetup
             ? "Tell other students a bit about yourself. You can change this any time."
             : "Update what other students see."}
+          {profileId && (
+            <>
+              {" "}
+              <Link to={`/profile/${profileId}`} className="font-medium text-accent-dark hover:underline">
+                View my profile
+              </Link>
+            </>
+          )}
         </p>
       </div>
 
@@ -120,6 +134,11 @@ export default function ProfileFormPage() {
 
       <section className="space-y-5 rounded-3xl border border-line bg-white p-6 sm:p-8">
         <h2 className="font-display text-xl font-semibold">About you</h2>
+        {profileId ? (
+          <PhotoUpload name={user?.username ?? ""} photoUrl={photoUrl} onChange={(p) => setPhotoUrl(p.photoUrl)} />
+        ) : (
+          <p className="text-sm text-muted">You can add a profile photo once you finish setup.</p>
+        )}
         <div className="grid gap-5 sm:grid-cols-3">
           <TextField
             label="Date of birth"

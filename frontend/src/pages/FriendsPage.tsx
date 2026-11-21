@@ -176,7 +176,7 @@ function PersonRow({ user, testId, children }: { user: OtherUser; testId?: strin
   const name = <span className="truncate font-semibold">{user.username}</span>;
   return (
     <div data-testid={testId} className="flex items-center gap-4 rounded-3xl border border-line bg-white p-4">
-      <Avatar name={user.username} />
+      <Avatar name={user.username} src={user.thumbnailUrl} />
       <div className="min-w-0 flex-1">
         {user.profileId ? (
           <Link to={`/profile/${user.profileId}`} className="hover:text-accent-dark">

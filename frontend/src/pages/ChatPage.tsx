@@ -95,7 +95,7 @@ function ChatView({ conversationId, myId }: { conversationId: number; myId: numb
       <BackLink />
 
       <header className="mt-3 flex items-center gap-3 rounded-t-3xl border border-line bg-white px-4 py-3">
-        <Avatar name={other.username} />
+        <Avatar name={other.username} src={other.thumbnailUrl} />
         <div className="min-w-0 flex-1">
           {other.profileId ? (
             <Link to={`/profile/${other.profileId}`} className="font-semibold hover:text-accent-dark">

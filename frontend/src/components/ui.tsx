@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 // Small shared building blocks so every page looks consistent.
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import { useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
+import { mediaUrl } from "../api/client";
 import { GENDER_OPTIONS } from "../api/types";
 
 export function Button({
@@ -100,11 +101,42 @@ const AVATAR_COLORS = [
   "bg-teal-100 text-teal-700",
 ];
 
-/** Initials in a colored circle; the same name always gets the same color. */
-export function Avatar({ name, size = "md" }: { name: string; size?: "md" | "lg" }) {
+const AVATAR_SIZES = {
+  md: "h-12 w-12 text-base",
+  lg: "h-20 w-20 text-2xl",
+  xl: "h-32 w-32 text-4xl",
+};
+
+/**
+ * The person's photo in a circle, or (no photo, or it fails to load) their
+ * initials in a colored circle; the same name always gets the same color.
+ * Lists pass the thumbnail URL; the profile page passes the main photo.
+ */
+export function Avatar({
+  name,
+  src,
+  size = "md",
+}: {
+  name: string;
+  src?: string | null;
+  size?: keyof typeof AVATAR_SIZES;
+}) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const url = mediaUrl(src);
+  const sizes = AVATAR_SIZES[size];
+  if (url && url !== failedSrc) {
+    return (
+      <img
+        src={url}
+        alt={name}
+        loading="lazy"
+        onError={() => setFailedSrc(url)}
+        className={`shrink-0 rounded-full bg-sand object-cover ${sizes}`}
+      />
+    );
+  }
   const hash = [...name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
   const color = AVATAR_COLORS[hash % AVATAR_COLORS.length];
-  const sizes = size === "lg" ? "h-20 w-20 text-2xl" : "h-12 w-12 text-base";
   return (
     <div
       className={`flex shrink-0 items-center justify-center rounded-full font-display font-semibold ${sizes} ${color}`}

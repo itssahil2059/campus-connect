@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiGet, errorMessage } from "../api/client";
 import type { PublicProfile } from "../api/types";
+import { useAuth } from "../auth/AuthContext";
 import ConnectButton from "../components/ConnectButton";
 import { Alert, Avatar, Chip, Spinner, basicsLine, classYear } from "../components/ui";
 
 /** /profile/:id — one student's full profile. */
 export default function ProfileViewPage() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [error, setError] = useState("");
 
@@ -33,7 +35,8 @@ export default function ProfileViewPage() {
       {profile && (
         <article className="mt-6 rounded-3xl border border-line bg-white p-6 sm:p-10">
           <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:gap-6 sm:text-left">
-            <Avatar name={profile.username} size="lg" />
+            {/* The full-size photo here; lists use the small thumbnail. */}
+            <Avatar name={profile.username} src={profile.photoUrl} size={profile.photoUrl ? "xl" : "lg"} />
             <div className="mt-4 sm:mt-0">
               <h1 className="font-display text-3xl font-semibold">{profile.username}</h1>
               <p className="mt-1 text-muted">
@@ -46,7 +49,14 @@ export default function ProfileViewPage() {
               )}
             </div>
             <div className="mt-6 sm:ml-auto sm:mt-0">
-              <ConnectButton userId={profile.userId} />
+              {profile.userId === user?.id ? (
+                <Link to="/profile/edit"
+                  className="inline-flex rounded-full border border-line px-5 py-2.5 text-sm font-medium transition hover:bg-sand">
+                  Edit profile
+                </Link>
+              ) : (
+                <ConnectButton userId={profile.userId} />
+              )}
             </div>
           </div>
 

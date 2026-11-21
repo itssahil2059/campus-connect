@@ -60,7 +60,7 @@ function ProfileCard({ profile }: { profile: PublicProfile }) {
       className="group flex flex-col rounded-3xl border border-line bg-white p-6 transition hover:-translate-y-0.5 hover:shadow-md"
     >
       <div className="flex items-center gap-4">
-        <Avatar name={profile.username} />
+        <Avatar name={profile.username} src={profile.thumbnailUrl} />
         <div className="min-w-0">
           <p className="truncate font-semibold group-hover:text-accent-dark">{profile.username}</p>
           <p className="truncate text-sm text-muted">{profile.collegeName}</p>
