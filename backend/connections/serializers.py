@@ -11,15 +11,21 @@ class ConnectionUserSerializer(serializers.ModelSerializer):
 
     # The frontend links to /profiles/<profile_id>; null if not set up yet.
     profile_id = serializers.SerializerMethodField()
+    # Small avatar for lists (friends, chats); null without a photo.
+    thumbnail_url = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "username", "college_name", "graduation_year", "profile_id"]
+        fields = ["id", "username", "college_name", "graduation_year", "profile_id", "thumbnail_url"]
         read_only_fields = fields
 
     def get_profile_id(self, user):
         profile = getattr(user, "profile", None)
         return profile.id if profile else None
+
+    def get_thumbnail_url(self, user):
+        profile = getattr(user, "profile", None)
+        return profile.photo_thumbnail.url if profile and profile.photo_thumbnail else None
 
 
 class ConnectionSerializer(serializers.ModelSerializer):

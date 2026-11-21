@@ -2,13 +2,16 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status, viewsets
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Answer, Profile, Question
+from .photos import PhotoError
 from .serializers import (
     AnswerSerializer,
     MyProfileSerializer,
+    PhotoUploadSerializer,
     PublicProfileSerializer,
     QuestionSerializer,
 )
@@ -39,6 +42,45 @@ class MyProfileView(APIView):
             serializer.data,
             status=status.HTTP_200_OK if profile else status.HTTP_201_CREATED,
         )
+
+
+class MyPhotoView(APIView):
+    """POST / DELETE /api/profiles/me/photo/ — upload or remove your photo.
+
+    Always acts on request.user's own profile (there's no id in the URL), so
+    nobody can change someone else's photo. POST replaces any existing photo;
+    both return the updated profile.
+    """
+
+    parser_classes = [MultiPartParser, FormParser]
+
+    def _my_profile(self, request):
+        return Profile.objects.filter(user=request.user).first()
+
+    def post(self, request):
+        profile = self._my_profile(request)
+        if profile is None:
+            return Response(
+                {"detail": "Set up your profile before adding a photo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = PhotoUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            profile.set_photo(serializer.validated_data["photo"])
+        except PhotoError as err:
+            return Response({"photo": [str(err)]}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(MyProfileSerializer(profile).data)
+
+    def delete(self, request):
+        profile = self._my_profile(request)
+        if profile is None:
+            return Response(
+                {"detail": "Profile not set up yet."}, status=status.HTTP_404_NOT_FOUND
+            )
+        if profile.photo:
+            profile.remove_photo()
+        return Response(MyProfileSerializer(profile).data)
 
 
 # Query param -> Profile JSON field. Each can repeat; all must match.
@@ -115,8 +157,10 @@ def filter_profiles(queryset, params):
 class ProfileViewSet(viewsets.ReadOnlyModelViewSet):
     """GET /api/profiles/ and /api/profiles/<id>/ — other students' profiles.
 
-    Only verified, active users, and never yourself. The list can be narrowed
-    with search/filter query params; see filter_profiles().
+    Only verified, active users. The list never includes yourself and can be
+    narrowed with search/filter query params (see filter_profiles()); the
+    detail URL also works for your own profile, so you can see how others
+    see you (photo included).
     """
 
     serializer_class = PublicProfileSerializer
@@ -126,11 +170,11 @@ class ProfileViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         queryset = (
             Profile.objects.filter(user__is_active=True, user__is_edu_verified=True)
-            .exclude(user=self.request.user)
             .select_related("user")  # one query instead of one per profile
             .order_by("-updated_at")
         )
         if self.action == "list":
+            queryset = queryset.exclude(user=self.request.user)
             queryset = filter_profiles(queryset, self.request.query_params)
         return queryset
 

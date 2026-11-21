@@ -68,7 +68,7 @@ export default function MessagesPage() {
               data-testid="conversation-row"
               className="flex items-center gap-4 rounded-3xl border border-line bg-white p-4 transition hover:shadow-md"
             >
-              <Avatar name={chat.otherUser.username} />
+              <Avatar name={chat.otherUser.username} src={chat.otherUser.thumbnailUrl} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-3">
                   <p className={`truncate ${unread ? "font-bold" : "font-semibold"}`}>{chat.otherUser.username}</p>

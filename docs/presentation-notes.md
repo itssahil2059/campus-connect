@@ -618,6 +618,63 @@ and validated the Nginx config with `nginx -t` in Docker.
 
 ---
 
+## 17. Profile photos (branch `sa18-profile-photo`)
+
+**What was done**
+- Students upload one profile photo on **Edit profile**: choose, see a
+  preview, upload (with a spinner), change or remove it. Wrong type or over
+  10 MB shows a clear message straight away.
+- The **profile page** shows the full photo; the **feed, Discover, Friends and
+  Messages** show a small thumbnail. No photo → the same initials circle as
+  before.
+- Backend: `POST` / `DELETE /api/profiles/me/photo/`, plus `photo_url` and
+  `thumbnail_url` in profile responses (`profiles/photos.py` does the work).
+- Accepts JPEG, PNG, WebP and **HEIC** (iPhone photos) via `pillow-heif`.
+- Saved on the server's disk for now (`backend/media/`, served by Nginx);
+  switching to S3 later is a settings change.
+- Tests: 22 new API tests (177 total) and UI-30 (30 UI tests, 207 total).
+
+**The compression pipeline, in plain language** (every upload, same steps)
+1. **Size check first.** Anything over 10 MB is refused before we even look
+   at it, so nobody can tie up the server with a huge file.
+2. **Is it really a picture?** We open it with Pillow, Python's image
+   library. A PDF renamed to `.jpg` fails here; the file name doesn't fool
+   it. Pillow also refuses "decompression bombs": tiny files that would
+   unpack into billions of pixels and eat all the memory.
+3. **Turn it the right way up.** Phones often save a photo sideways and add
+   a note saying "rotate me". We apply that rotation to the pixels, so the
+   photo looks right everywhere.
+4. **Remove all hidden information.** Phone photos carry metadata, including
+   the **GPS location where the photo was taken**. On a dating app that could
+   reveal where someone lives. We copy just the pixels into a brand-new image,
+   so none of that comes along.
+5. **Shrink it.** The longest side becomes at most 1080 px (what Instagram
+   uses), saved as JPEG. We start at high quality and lower it step by step
+   until the file is about 300 KB. A 7.5 MB phone photo ends up ~250 KB:
+   about 30× smaller, and it looks the same on a phone screen.
+6. **Make a thumbnail.** A 200×200 square crop, around 10–20 KB, for lists.
+   A page of 20 students then loads ~300 KB of pictures instead of 6 MB.
+7. **Random file names.** Files are saved as random IDs
+   (`3f2a…c1.jpg`), never the student's name or the original file name.
+   When a photo is replaced or removed, or the account is deleted, the old
+   files are deleted too.
+
+**Talking points**
+- *Why process on the server, not in the browser:* "The browser can be
+  bypassed, so anyone could send any file straight to the API. The server is
+  the only place we can be sure every photo is checked and cleaned."
+- *Privacy:* "The GPS removal is tested: we upload a photo with fake
+  coordinates and check the saved file has no EXIF data at all."
+- *Security:* "Only the logged-in user can change their own photo. The upload
+  URL has no user ID in it, so there's nothing to swap for someone else's."
+- *Why delete only after the database saves:* "If saving the new photo fails
+  halfway, the profile still points at the old files, so we delete them only
+  once the change is final."
+- *Cost:* "About 300 KB per student. Even 1,000 students is 300 MB, well
+  within the free disk."
+
+---
+
 ## Git workflow (worth mentioning — version control is 25% of the grade)
 - Feature branches per task (`sa1-api-docs`, `sa2-auth`), merged into `dev`
   via pull requests. Teammates use the same flow (`setup-cezar`,
@@ -639,5 +696,7 @@ and validated the Nginx config with `nginx -t` in Docker.
    other students; click a card to open their profile.
 6. Discover → Search: type a like (e.g. `coffee`) and press Enter; the list
    narrows to students who like it.
-7. Run the tests live: `pytest` (API) and `HEADED=1 pytest tests_ui` (watch
+7. Edit profile → **Choose photo** → upload a phone photo → **View my profile**
+   shows it; Home and Friends show the small version.
+8. Run the tests live: `pytest` (API) and `HEADED=1 pytest tests_ui` (watch
    Chrome click through signup and login on its own).

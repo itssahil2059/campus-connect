@@ -53,7 +53,35 @@ class LinkListField(serializers.ListField):
         return list(dict.fromkeys(links))  # drop duplicates, keep order
 
 
-class MyProfileSerializer(serializers.ModelSerializer):
+def file_url(field):
+    """URL of a stored file, or None. Relative ("/media/...") with disk
+    storage; S3 storage would return a full https:// URL instead."""
+    return field.url if field else None
+
+
+class PhotoUrlsMixin(serializers.Serializer):
+    """photo_url + thumbnail_url, both null when there's no photo."""
+
+    photo_url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
+
+    def get_photo_url(self, profile):
+        return file_url(profile.photo)
+
+    def get_thumbnail_url(self, profile):
+        return file_url(profile.photo_thumbnail)
+
+
+class PhotoUploadSerializer(serializers.Serializer):
+    """Input for POST /api/profiles/me/photo/ (multipart form, field "photo").
+
+    Only checks that a file was sent; profiles/photos.py checks the file itself.
+    """
+
+    photo = serializers.FileField()
+
+
+class MyProfileSerializer(PhotoUrlsMixin, serializers.ModelSerializer):
     """The logged-in user's own profile (editable)."""
 
     interests = TagListField()
@@ -68,7 +96,8 @@ class MyProfileSerializer(serializers.ModelSerializer):
         model = Profile
         fields = [
             "id", "bio", "date_of_birth", "gender", "city",
-            "interests", "likes", "dislikes", "links", "updated_at",
+            "interests", "likes", "dislikes", "links",
+            "photo_url", "thumbnail_url", "updated_at",
         ]
         read_only_fields = ["id", "updated_at"]
         extra_kwargs = {"gender": {"required": False}}
@@ -85,7 +114,7 @@ class MyProfileSerializer(serializers.ModelSerializer):
         return born
 
 
-class PublicProfileSerializer(serializers.ModelSerializer):
+class PublicProfileSerializer(PhotoUrlsMixin, serializers.ModelSerializer):
     """Another student's profile as shown on Home. Never includes their email."""
 
     # Needed to send a connection request or open a chat with this student.
@@ -112,6 +141,8 @@ class PublicProfileSerializer(serializers.ModelSerializer):
             "likes",
             "dislikes",
             "links",
+            "photo_url",
+            "thumbnail_url",
         ]
         read_only_fields = fields
 

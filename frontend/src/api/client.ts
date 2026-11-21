@@ -39,23 +39,41 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Full URL for an uploaded file. The API returns "/media/..." paths (files on
+ * the API server's disk), so in dev they need the API host in front; full
+ * URLs (e.g. S3 later) are used as they are.
+ */
+export function mediaUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  return /^https?:\/\//.test(url) ? url : `${BASE_URL}${url}`;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = localStorage.getItem("token");
+  // FormData (file uploads) is sent as-is: the browser sets the multipart
+  // Content-Type itself. Everything else is JSON with snake_case keys.
+  const isForm = body instanceof FormData;
   let res: Response;
   try {
     res = await fetch(`${BASE_URL}${path}`, {
       method,
       headers: {
-        "Content-Type": "application/json",
+        ...(isForm ? {} : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Token ${token}` } : {}),
       },
-      body: body === undefined ? undefined : JSON.stringify(convertKeys(body, toSnake)),
+      body:
+        body === undefined ? undefined : isForm ? body : JSON.stringify(convertKeys(body, toSnake)),
     });
   } catch {
     // fetch only throws when the server can't be reached at all.
     throw new ApiError(0, { detail: "Can't reach the server. Is the backend running?" });
   }
   if (res.status === 204) return undefined as T;
+  // Nginx rejects bodies over its limit before Django sees them (no JSON).
+  if (res.status === 413) {
+    throw new ApiError(413, { detail: "That file is too large. The maximum size is 10 MB." });
+  }
   const json = convertKeys(await res.json().catch(() => ({})), toCamel);
   if (!res.ok) throw new ApiError(res.status, json as Record<string, unknown>);
   return json as T;
@@ -65,6 +83,8 @@ export const apiGet = <T>(path: string) => request<T>("GET", path);
 export const apiPost = <T>(path: string, body?: unknown) => request<T>("POST", path, body);
 export const apiPut = <T>(path: string, body?: unknown) => request<T>("PUT", path, body);
 export const apiDelete = <T>(path: string) => request<T>("DELETE", path);
+/** Multipart POST, for file uploads. */
+export const apiUpload = <T>(path: string, form: FormData) => request<T>("POST", path, form);
 
 /** First error message per field, e.g. { schoolEmail: "Please use your .edu school email." } */
 export function fieldErrors(err: unknown): Record<string, string> {

@@ -24,6 +24,16 @@ main() {
   .venv/bin/python manage.py migrate --noinput
   .venv/bin/python manage.py collectstatic --noinput --verbosity 0
 
+  echo "==> Media folder for uploaded profile photos"
+  # Wherever MEDIA_ROOT points (default backend/media). Owned by ubuntu, the
+  # user the API runs as (gittogether.service), so Django can write photos;
+  # 755 so Nginx (www-data) can read them.
+  MEDIA_DIR="$(.venv/bin/python manage.py shell --verbosity 0 -c 'from django.conf import settings; print(settings.MEDIA_ROOT)')"
+  if [ ! -d "$MEDIA_DIR" ]; then
+    sudo install -d -m 755 -o ubuntu -g ubuntu "$MEDIA_DIR"
+    echo "    created $MEDIA_DIR"
+  fi
+
   echo "==> Frontend: build"
   cd ../frontend
   npm ci --no-audit --no-fund --loglevel=error

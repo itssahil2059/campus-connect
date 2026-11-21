@@ -29,6 +29,8 @@ type Student = {
   /** User id: the connections and chat APIs need this one, not the profile id. */
   userId: number;
   name: string;
+  /** 200 px photo thumbnail, or null (initials). */
+  thumbnailUrl: string | null;
   college: string;
   classLabel: string | null;
   /** "21 · Woman · Texarkana", or "" if not filled in. */
@@ -43,6 +45,7 @@ const sampleStudents: Student[] = [
     id: 1,
     userId: 1,
     name: "maya_patel",
+    thumbnailUrl: null,
     college: "Texas A&M University",
     classLabel: "Class of 2027",
     basics: "",
@@ -54,6 +57,7 @@ const sampleStudents: Student[] = [
     id: 2,
     userId: 2,
     name: "jordan_lee",
+    thumbnailUrl: null,
     college: "University of Texas at Austin",
     classLabel: "Class of 2028",
     basics: "",
@@ -65,6 +69,7 @@ const sampleStudents: Student[] = [
     id: 3,
     userId: 3,
     name: "sofia_r",
+    thumbnailUrl: null,
     college: "Rice University",
     classLabel: "Class of 2026",
     basics: "",
@@ -97,6 +102,7 @@ function fromProfile(p: PublicProfile, mine: string[]): Student {
     id: p.id,
     userId: p.userId,
     name: p.username,
+    thumbnailUrl: p.thumbnailUrl,
     college: p.collegeName ?? "",
     classLabel: p.graduationYear
       ? classYear(p.graduationYear)
@@ -162,7 +168,7 @@ function StudentCard({
   return (
     <article className="flex flex-col rounded-3xl border border-line bg-white p-6 transition hover:shadow-md">
       <div className="flex items-center gap-4">
-        <Avatar name={student.name} />
+        <Avatar name={student.name} src={student.thumbnailUrl} />
 
         <div className="min-w-0">
           <p className="truncate font-semibold">{student.name}</p>

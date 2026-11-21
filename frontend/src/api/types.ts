@@ -31,6 +31,9 @@ export interface MyProfile {
   likes: string[];
   dislikes: string[];
   links: string[];
+  /** Processed photo (<= 1080 px JPEG) and 200 px thumbnail; null without a photo. Pass through mediaUrl(). */
+  photoUrl: string | null;
+  thumbnailUrl: string | null;
 }
 
 export interface PublicProfile {
@@ -48,6 +51,8 @@ export interface PublicProfile {
   likes: string[];
   dislikes: string[];
   links: string[];
+  photoUrl: string | null;
+  thumbnailUrl: string | null;
 }
 
 export interface Question {
@@ -74,6 +79,8 @@ export interface OtherUser {
   graduationYear: number | null;
   /** Null until they set up a profile. */
   profileId: number | null;
+  /** Their 200 px photo thumbnail, or null (show initials). */
+  thumbnailUrl: string | null;
 }
 
 export interface Connection {

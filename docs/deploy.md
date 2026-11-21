@@ -372,6 +372,42 @@ couldn't send the verification email" and doesn't create the account.
 
 Costs: SES charges $0.10 per 1,000 emails, covered by the Free Plan credits.
 
+## Profile photos (uploads on the server's disk)
+
+Photos are saved by Django into `MEDIA_ROOT` (default
+`~/campus-connect/backend/media/`, git-ignored) and served by Nginx at
+`/media/`. **There are no one-time steps:** a normal deploy does everything.
+
+```bash
+ssh -i ~/.ssh/gittogether-key.pem ubuntu@<ELASTIC_IP>
+~/campus-connect/deploy/deploy.sh            # or: deploy.sh dev
+```
+
+What that deploy does for photos:
+
+1. `pip install -r requirements.txt` installs **Pillow** and **pillow-heif**
+   (prebuilt wheels with their image libraries included: no `apt` packages).
+2. `migrate` adds the two photo columns to the profile table.
+3. Creates the media folder if it's missing, owned by `ubuntu` (the user
+   Daphne runs as, so Django can write) with mode `755` (so Nginx can read).
+4. Reloads Nginx, which picks up the new `/media/` location in
+   `nginx-app.conf` (it's included straight from the repo).
+
+Check it worked (after uploading a photo on the site):
+
+```bash
+ls -la ~/campus-connect/backend/media/profile_photos/       # drwxr-xr-x ubuntu ubuntu; *.jpg files
+curl -sI https://datewithincampus.com/media/profile_photos/<file>.jpg | head -5
+#   HTTP/1.1 200 OK, Content-Type: image/jpeg, Cache-Control: max-age=2592000
+```
+
+**Good to know**
+- The photos live only on this EC2 disk (EBS volume). They survive reboots and
+  deploys, but **terminating the instance deletes them**. Moving to S3 later
+  is a settings change (`django-storages` + `STORAGES["default"]`); the code
+  saves through Django's storage API, so nothing else changes.
+- Disk use is small: about 300 KB per student (photo + thumbnail).
+
 ## Handy commands (on the server)
 
 | What | Command |
@@ -394,6 +430,8 @@ Costs: SES charges $0.10 per 1,000 emails, covered by the Free Plan credits.
 | Django log: `could not connect to server` | RDS endpoint/password wrong, or RDS not connected to this EC2 |
 | Chat doesn't update live, but messages appear after a refresh | WebSocket not connecting. Check `redis-cli ping`, that `/ws/` is in the Nginx site (`sudo nginx -T \| grep ws`), and `journalctl -u gittogether -n 50` |
 | WebSocket closes right away with 403 | The page's address isn't in `ALLOWED_HOSTS` (the origin check uses it) |
+| Photo upload fails with "too large" for a file under 10 MB | Nginx's limit counts the whole request, not just the file; a file within a few KB of 10 MB can just tip it over. Check `client_max_body_size` in `nginx-app.conf` |
+| Photos show as initials, `/media/...` gives 403 or 404 | Media folder missing or not readable: `ls -ld ~/campus-connect/backend/media` should be `drwxr-xr-x ubuntu`; re-run `deploy.sh`. 404 for every file: check `sudo nginx -T \| grep media` |
 | `ssh: Permission denied` | Wrong key file, or `chmod 400` not done, or your IP changed (update the SSH rule to *My IP*) |
 
 ## Stopping costs (end of semester)

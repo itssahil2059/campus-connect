@@ -206,6 +206,16 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# Uploaded files (profile photos). Saved on this server's disk for now;
+# Nginx serves MEDIA_ROOT at /media/ in production, Django does in DEBUG.
+# Moving to S3 later = install django-storages and set STORAGES["default"].
+MEDIA_URL = os.environ.get('MEDIA_URL', '/media/')
+# A relative MEDIA_ROOT is relative to backend/ (absolute paths stay as-is).
+MEDIA_ROOT = BASE_DIR / os.environ.get('MEDIA_ROOT', 'media')
+# Readable by Nginx (www-data), writable only by the app user.
+FILE_UPLOAD_PERMISSIONS = 0o644
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Print warnings/errors to the console. On the server that's the Daphne log
