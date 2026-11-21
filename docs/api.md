@@ -2,7 +2,7 @@
 
 Base URL (local): http://127.0.0.1:8000
 All responses are JSON. The frontend's `api/client.ts` converts snake_case to camelCase.
-Every endpoint except signup/verify/login needs the header `Authorization: Token <token>`
+Every endpoint except signup/verify/resend-verification/login needs the header `Authorization: Token <token>`
 (401 without it).
 
 The tables are the overall plan. Sections marked **Contract** are built and
@@ -11,7 +11,8 @@ tested: build the frontend against those exactly.
 ## Auth (Weeks 2–3)
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | /api/auth/signup/ | Create account (.edu email only), sends verification email |
+| POST | /api/auth/signup/ | Create account (.edu email only), sends verification email. **503** if the email can't be sent; the account is then not created, so the student can retry |
+| POST | /api/auth/resend-verification/ | Body `{"school_email"}`. Sends a new link if that account exists and isn't verified. Always the same 200 answer (doesn't reveal who has an account); 503 if sending fails; 5 per hour per IP (429 after) |
 | GET | /api/auth/verify/<uid>/<token>/ | Activate account from email link |
 | POST | /api/auth/login/ | Returns login token |
 | POST | /api/auth/logout/ | Ends session |

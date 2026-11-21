@@ -1,14 +1,7 @@
 import pytest
-from django.core.cache import cache
 
 from chat.models import Conversation
 from connections.models import Connection
-
-
-@pytest.fixture(autouse=True)
-def clear_throttle_counts():
-    """Rate-limit counters live in the cache; start every test fresh."""
-    cache.clear()
 
 
 @pytest.fixture

@@ -10,13 +10,13 @@ connect as friends, and chat in real time.
 CS 495 Capstone, Texas A&M University–Texarkana, Fall 2026. Team **Git
 Together** ([TEAM.md](TEAM.md)).
 
-**Live site:** http://18.119.39.20
+**Live site:** https://datewithincampus.com
 
 ## Features
 
 | Area | What it does |
 | --- | --- |
-| Sign up and verification | `.edu` emails only, one account per email; a verification link must be opened before the first login |
+| Sign up and verification | `.edu` emails only, one account per email; a verification link (sent with AWS SES) must be opened before the first login; students can ask for a new link |
 | Login | Token login and logout; private pages redirect to login |
 | Profile | Bio, interests, likes, dislikes, up to 5 links, age, gender, city. Date of birth is required (18+) but kept private: others only see the age |
 | Questionnaire | Multiple-choice preference questions, saved to the account and editable later |
@@ -34,7 +34,7 @@ Together** ([TEAM.md](TEAM.md)).
 | Realtime chat | Django Channels + Redis |
 | Database | PostgreSQL 16 |
 | Frontend | React, Vite, TypeScript, Tailwind CSS |
-| Hosting | AWS EC2 (Nginx + Daphne) and AWS RDS (PostgreSQL) |
+| Hosting | AWS EC2 (Nginx + Daphne), AWS RDS (PostgreSQL), AWS SES (email), HTTPS via Let's Encrypt |
 | Tests | pytest + pytest-django (unit/API), Selenium (UI automation) |
 | CI | GitHub Actions on every pull request |
 
@@ -42,9 +42,9 @@ Together** ([TEAM.md](TEAM.md)).
 
 | Suite | Tests | Command (from `backend/`) |
 | --- | --- | --- |
-| Unit + API (pytest) | 147 | `pytest` |
-| UI automation (Selenium, Chrome) | 28 | `pytest tests_ui` |
-| **Total** | **175** | |
+| Unit + API (pytest) | 155 | `pytest` |
+| UI automation (Selenium, Chrome) | 29 | `pytest tests_ui` |
+| **Total** | **184** | |
 
 Every test case, with its steps, expected result and the project task it
 covers, is listed in [docs/test-cases.md](docs/test-cases.md). Add

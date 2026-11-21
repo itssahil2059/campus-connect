@@ -588,6 +588,36 @@ and validated the Nginx config with `nginx -t` in Docker.
 
 ---
 
+## 16. Real email: AWS SES + resend link (Nov 21, 2026)
+
+**What was done**
+- Verification emails go through **AWS SES** over SMTP from
+  `no-reply@datewithincampus.com`. No new package: Django's SMTP email
+  backend is configured from the server's `.env`. Guide: `docs/deploy.md`,
+  "Real email (AWS SES)".
+- **Signup is all-or-nothing:** saving the account and sending the email run in
+  one database transaction. If the email fails, the account is rolled back and
+  the student sees "We couldn't send the verification email", so nobody is
+  stuck with an account they can't verify.
+- **Resend link:** `POST /api/auth/resend-verification/`, a **Resend the email**
+  button on the check-email page, and a **Resend the link** link in the login
+  error for unverified accounts. Limited to 5 per hour per IP.
+- `EMAIL_TIMEOUT` = 10 s so a slow mail server can't hang signup.
+- Tests: 8 new API tests (155 total) and UI-29 (29 UI tests, 184 total).
+
+**Talking points**
+- *Why the same answer every time:* "Resend says 'if that account exists,
+  we've sent a link' whether or not it exists. Otherwise anyone could type
+  emails in and find out who uses the app."
+- *Why the transaction:* "Before, if the email failed, the account was already
+  saved. The student couldn't log in and couldn't sign up again, because the
+  email was taken. Now both happen together or neither does."
+- *Email deliverability:* "We verified our domain in SES with DKIM, so every
+  email carries a signature proving it's really from datewithincampus.com. That
+  keeps verification emails out of spam."
+
+---
+
 ## Git workflow (worth mentioning — version control is 25% of the grade)
 - Feature branches per task (`sa1-api-docs`, `sa2-auth`), merged into `dev`
   via pull requests. Teammates use the same flow (`setup-cezar`,

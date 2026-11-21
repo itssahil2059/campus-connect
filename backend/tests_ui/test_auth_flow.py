@@ -13,7 +13,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from core.testing import UI_TEST_FRONTEND_URL as FRONTEND_URL
 from profiles.models import Profile
 
-from helpers import fill_signup, log_in, stored_token  # tests_ui/helpers.py
+from helpers import click_button, fill_signup, log_in, stored_token  # tests_ui/helpers.py
 
 # live_server needs real commits (not a rolled-back transaction) so the
 # server thread can see the data each test creates.
@@ -98,7 +98,19 @@ def test_ui07_unverified_user_cannot_log_in(page, wait, make_user):
 
     log_in(page, "alice@tamut.edu")
 
-    assert alert(wait).text == "Please verify your email before logging in."
+    assert alert(wait).text.startswith("Please verify your email before logging in.")
+
+
+def test_ui29_unverified_user_can_resend_verification_email(page, wait, make_user, mailoutbox):
+    make_user(school_email="alice@tamut.edu", is_active=False)
+    log_in(page, "alice@tamut.edu")
+
+    wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "Resend the link"))).click()
+    wait.until(EC.url_contains("/check-email"))
+    click_button(wait, "Resend the email")
+
+    wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "[data-testid=resend-notice]")))
+    assert mailoutbox[-1].to == ["alice@tamut.edu"]  # a new link went out
 
 
 def test_ui08_first_login_goes_to_profile_setup(page, wait, make_student):

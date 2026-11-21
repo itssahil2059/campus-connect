@@ -145,6 +145,8 @@ REST_FRAMEWORK = {
     # in Django's cache (per process), which is fine for one server.
     'DEFAULT_THROTTLE_RATES': {
         'chat_send': '60/min',
+        # Per IP address (these users aren't logged in).
+        'resend_verification': '5/hour',
     },
 }
 
@@ -164,6 +166,9 @@ EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = env_bool('EMAIL_USE_TLS', True)
+# Seconds to wait for the mail server before giving up (default: forever,
+# which would hang the signup request).
+EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', 10))
 
 # Where the React app runs. Emailed links (e.g. email verification) point
 # here; the frontend page then calls the API.

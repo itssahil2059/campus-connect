@@ -110,6 +110,12 @@ class LoginSerializer(serializers.Serializer):
         return attrs
 
 
+class ResendVerificationSerializer(serializers.Serializer):
+    """POST /api/auth/resend-verification/ body."""
+
+    school_email = serializers.EmailField()
+
+
 class UserSelfSerializer(serializers.ModelSerializer):
     """The logged-in user's own account data (includes their email).
 
