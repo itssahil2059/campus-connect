@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import SimpleRouter
 
-from .views import AnswersView, MyProfileView, ProfileViewSet, QuestionViewSet
+from .views import AnswersView, MyPhotoView, MyProfileView, ProfileViewSet, QuestionViewSet
 
 app_name = "profiles"
 
@@ -14,5 +14,6 @@ router.register("questions", QuestionViewSet, basename="question")
 urlpatterns = [
     # Listed before the router so "me" is never treated as an id.
     path("profiles/me/", MyProfileView.as_view(), name="my-profile"),
+    path("profiles/me/photo/", MyPhotoView.as_view(), name="my-photo"),
     path("answers/", AnswersView.as_view(), name="answers"),
 ] + router.urls

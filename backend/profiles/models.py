@@ -1,6 +1,8 @@
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
+
+from .photos import PHOTO_DIR, delete_files, photo_files
 
 
 def age_on(born, today):
@@ -35,6 +37,11 @@ class Profile(models.Model):
     dislikes = models.JSONField(default=list, blank=True)
     # Up to 5 http(s) URLs: LinkedIn, GitHub, Instagram, a portfolio, etc.
     links = models.JSONField(default=list, blank=True)
+    # One photo per user, already processed (see photos.py): an upright,
+    # metadata-free JPEG (<= 1080 px) plus a 200 px square thumbnail.
+    # File names are random UUIDs.
+    photo = models.ImageField(upload_to=PHOTO_DIR, blank=True)
+    photo_thumbnail = models.ImageField(upload_to=f"{PHOTO_DIR}/thumbs", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -46,6 +53,31 @@ class Profile(models.Model):
         if self.date_of_birth is None:
             return None
         return age_on(self.date_of_birth, timezone.localdate())
+
+    def set_photo(self, upload):
+        """Process and save a new photo, then delete the old files.
+
+        Raises photos.PhotoError (with a user-friendly message) for a bad
+        upload; nothing is changed in that case.
+        """
+        main, thumb = photo_files(upload)
+        old = (self.photo.name, self.photo_thumbnail.name)
+        self.photo.save(main.name, main, save=False)
+        self.photo_thumbnail.save(thumb.name, thumb, save=False)
+        self.save(update_fields=["photo", "photo_thumbnail", "updated_at"])
+        self._delete_after_commit(*old)
+
+    def remove_photo(self):
+        old = (self.photo.name, self.photo_thumbnail.name)
+        self.photo = self.photo_thumbnail = ""
+        self.save(update_fields=["photo", "photo_thumbnail", "updated_at"])
+        self._delete_after_commit(*old)
+
+    @staticmethod
+    def _delete_after_commit(*names):
+        # Only once the database change is final: if the save is rolled back,
+        # the row still points at the old files, so they must still exist.
+        transaction.on_commit(lambda: delete_files(*names))
 
 
 class Question(models.Model):
