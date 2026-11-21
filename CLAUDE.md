@@ -51,9 +51,9 @@ resources, new major deps, migrations rewrites, AUTH_USER_MODEL).
   in production run Redis on the same EC2 instance (ElastiCache isn't worth the
   cost on the free plan)
 - Frontend: React + Vite + TypeScript + Tailwind
-- Media: AWS S3 for profile images (via `django-storages` + `boto3`) — swaps
-  out the earlier Cloudinary plan; going full AWS to match the course's cloud
-  environment
+- Media: profile photos on the EC2 disk for now (MEDIA_ROOT, served by Nginx
+  at /media/; processed by `profiles/photos.py` with Pillow + pillow-heif).
+  Later: AWS S3 via `django-storages` + `boto3` (just a STORAGES setting)
 - Hosting: **AWS EC2 (decided Oct 10 2026, not Elastic Beanstalk)**. AWS account
   is on the 6-month credit-based Free Plan. Plan: one EC2 instance running
   Nginx (serves the React build + proxies /api and /admin to gunicorn) and
@@ -134,10 +134,11 @@ python manage.py runserver
 ## Build order (dependency-first — build in this order, don't jump ahead)
 1. **User auth + .edu verification** — signup, login, school-email domain check,
    email verification via `default_token_generator`. **Done, with pytest + Selenium tests.**
-2. Profile creation + preference quiz (incl. image upload via S3, and an
+2. Profile creation + preference quiz (incl. image upload, and an
    "insert links" field). **Profile + questionnaire API and pages done, links
-   field done, date of birth (private, 18+) / gender / city done; image
-   upload (S3) not yet.**
+   field done, date of birth (private, 18+) / gender / city done; profile
+   photo done (branch sa18-profile-photo: server disk via MEDIA_ROOT, S3 later
+   via django-storages).**
 3. Suggested Interest / discovery feed — looser, randomized browse surface
    ("like YouTube subscriptions" per the team's own description).
 4. Search/Filter — precise narrowing (name, college, interests, likes/dislikes).

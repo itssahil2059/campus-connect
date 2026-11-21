@@ -27,7 +27,7 @@ The UI tests start everything they need on their own: a throwaway Django server
 on an empty test database, the React dev server pointed at it (port 5174),
 and Chrome. CI runs both suites on every pull request (`.github/workflows/ci.yml`).
 
-## UI test cases (Selenium) — 29 tests
+## UI test cases (Selenium) — 30 tests
 
 Every test starts logged out with an empty database and creates only the data
 it needs. "Steps" are what the browser does; "Expected" is the main check.
@@ -63,6 +63,12 @@ Files are in `backend/tests_ui/`.
 | UI-27 | `test_ui27_under_18_birthday_is_blocked` | Adults only (18+) | New user on `/profile/setup` enters a birthday 17 years and 364 days ago; clicks **Finish setup** | The date field is invalid and no profile is saved | T2 Registration/Authentication / T3 Profile Creation |
 | UI-28 | `test_ui28_search_filters_by_city` | Search by city | Discover → Search (Bob in Dallas, Carol in Texarkana); type `texarkana` in **City** | Only Carol is listed | T7 Search and Filtering |
 
+### Profile photo (`test_photo_flow.py`)
+
+| ID | Test name | What it tests | Steps | Expected result | Requirement (Phase 3 task) |
+| --- | --- | --- | --- | --- | --- |
+| UI-30 | `test_ui30_upload_photo_and_see_it_on_profile` | Uploading a profile photo | Alice opens `/profile/edit`; chooses a 2400×1600 JPEG; the preview appears; clicks **Upload photo**, then **View my profile** | Her profile page shows the photo, loaded from `/media/…`, resized to 1080 px wide | T3 Profile Creation |
+
 ### Friends, chat and Discover (`test_social_flow.py`)
 
 | ID | Test name | What it tests | Steps | Expected result | Requirement (Phase 3 task) |
@@ -81,12 +87,11 @@ Files are in `backend/tests_ui/`.
 
 | Phase 3 task | Requirement | Status |
 | --- | --- | --- |
-| T3 Profile Creation | Upload a profile image, or pick a default one | Not built (needs S3) |
 | T4 Preference Questionnaire | After the questionnaire, go to Discover showing students with similar answers | Setup goes to Home; matching on answers not built |
 | T6 Discovery Page | Refresh capability | Not built |
 | T9 Private Messages | Send and view images/videos (links work as text) | Not built |
 
-## Unit and API tests (pytest) — 155 tests
+## Unit and API tests (pytest) — 177 tests
 
 These call the Django API directly through DRF's test client (no browser), so
 they're fast and cover edge cases the UI tests don't.
@@ -95,17 +100,18 @@ they're fast and cover edge cases the UI tests don't.
 | --- | --- | --- | --- |
 | users | `users/tests/test_views.py` | 42 | Signup validation (.edu only, duplicates in any case, password rules, college required); verification links (tampered/foreign/old tokens rejected, link dies after first login); login/logout/me, token reuse and revocation, one generic error for bad credentials; signup rolled back if the email can't be sent; resend link (works, same answer for unknown/verified emails, 503 on failure, rate limit) |
 | profiles | `profiles/tests/test_views.py` | 51 | Create/update own profile; date of birth required, 18+ only, no future/impossible dates; gender choices; city; public profiles show age, never the birth date; tag cleaning and limits; links (http(s) only, max 5, https added); public profiles hide email and exclude yourself and unverified users; questionnaire answers (save, replace, invalid choice rejected, private); search/filter params incl. city, gender and age range (parametrized tables) |
+| profiles | `profiles/tests/test_photos.py` | 22 | Photo pipeline and API (PH-01–PH-21): a 7.5 MB photo comes out ≤ 1080 px and under 1 MB; 200 px thumbnail created; GPS/EXIF/camera metadata removed; sideways phone photos rotated upright; PNG/WebP/HEIC accepted, GIF rejected; random file names; over 10 MB rejected before decoding; a PDF renamed `.jpg` rejected; replacing or removing a photo deletes the old files; deleting the account deletes the files; login required; nobody can change someone else's photo; `photo_url`/`thumbnail_url` in profile, connection and chat responses |
 | connections | `connections/tests/test_models.py` | 5 | One row per pair, no self-connections, status from each side |
 | connections | `connections/tests/test_views.py` | 20 | Send/accept/decline/cancel/remove requests; privacy (others can't see your connections); declined senders can't resend |
 | chat | `chat/tests/test_models.py` | 8 | One conversation per pair; only participants can send; no sending after disconnect; read receipts |
 | chat | `chat/tests/test_views.py` | 17 | Starting a chat requires an accepted connection; chat list and unread counts; message history paging; blank/too-long messages rejected; rate limiting |
 | chat | `chat/tests/test_consumers.py` | 12 | WebSocket chat: login required, only participants can join, other-site origins rejected, live delivery to both sides, invalid messages get errors, read receipts |
-| **Total** | | **155** | |
+| **Total** | | **177** | |
 
 ## Totals
 
 | Suite | Tests | Command |
 | --- | --- | --- |
-| Unit + API (pytest) | 155 | `pytest` |
-| UI automation (Selenium) | 29 | `pytest tests_ui` |
-| **All** | **184** | |
+| Unit + API (pytest) | 177 | `pytest` |
+| UI automation (Selenium) | 30 | `pytest tests_ui` |
+| **All** | **207** | |

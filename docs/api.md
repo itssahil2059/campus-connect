@@ -21,9 +21,9 @@ tested: build the frontend against those exactly.
 ## Profiles & questionnaire (Weeks 4–5)
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET / PUT | /api/profiles/me/ | My profile (`bio`, `date_of_birth` (required, 18+), `gender`, `city`, `interests`, `likes`, `dislikes`, `links`: up to 5 http(s) URLs) |
-| GET | /api/profiles/<id>/ | Another student's profile (includes `user_id`, used for connections and chat, and `age`, never `date_of_birth`) |
-| POST | /api/profiles/me/photo/ | Upload profile photo |
+| GET / PUT | /api/profiles/me/ | My profile (`bio`, `date_of_birth` (required, 18+), `gender`, `city`, `interests`, `likes`, `dislikes`, `links`: up to 5 http(s) URLs; read-only `photo_url`, `thumbnail_url`) |
+| GET | /api/profiles/<id>/ | A student's profile, including your own (includes `user_id`, used for connections and chat, `age`, never `date_of_birth`, and `photo_url`/`thumbnail_url`) |
+| POST / DELETE | /api/profiles/me/photo/ | Upload (multipart) or remove my profile photo (done; see below) |
 | GET | /api/questions/ | Questionnaire questions |
 | GET / POST | /api/answers/ | My questionnaire answers |
 
@@ -54,6 +54,52 @@ with AND, and blank ones are ignored.
 Returns the same list as `GET /api/profiles/` (never yourself, only verified
 students).
 
+### Contract: profile photo
+One photo per student. The server processes every upload, so clients send
+the original file and get back the cleaned-up URLs.
+
+**`POST /api/profiles/me/photo/`**: `multipart/form-data` with one file
+field, `photo`. Replaces any existing photo (the old files are deleted).
+
+| Rule | Error (400, `{"photo": ["..."]}`) |
+| --- | --- |
+| Must be JPEG, PNG, WebP or HEIC, checked by opening it with Pillow (the file name and extension don't count) | "Please upload a JPG, PNG, WebP or HEIC photo." |
+| At most 10 MB, checked before the image is decoded | "That photo is too large. The maximum size is 10 MB." |
+| At most ~89 million pixels (Pillow's decompression-bomb limit) | "That image is too large to process. Please upload a smaller photo." |
+| No file sent | `"No file was submitted."` (DRF's message) |
+
+Also: **400** `{"detail": "Set up your profile before adding a photo."}` if
+`PUT /api/profiles/me/` hasn't been done yet. Through Nginx, a request over
+10 MB gets **413** before reaching Django.
+
+What gets stored: the photo rotated upright, **all metadata removed**
+(EXIF, GPS location, camera details), converted to RGB JPEG, longest side
+≤ 1080 px, ~200–300 KB (always < 1 MB); plus a 200×200 center-cropped
+thumbnail (~10–20 KB). File names are random UUIDs.
+
+Returns **200** with the full `GET /api/profiles/me/` body.
+
+**`DELETE /api/profiles/me/photo/`**: removes the photo and both files.
+Returns **200** with the profile (`photo_url: null`). Doing it with no photo
+is fine (still 200). **404** if the profile isn't set up.
+
+There's no user id in these URLs: they always act on the logged-in user's
+own profile, so nobody can change another student's photo.
+
+**URLs in responses.** `photo_url` (the ≤ 1080 px photo, for the profile
+page) and `thumbnail_url` (200 px, for lists and cards) are in
+`/api/profiles/me/`, `/api/profiles/` and `/api/profiles/<id>/`.
+Connections and chats include `thumbnail_url` on each `user` / `other_user`.
+All are `null` without a photo (show initials). They're paths like
+`/media/profile_photos/<uuid>.jpg`, relative to the API host (the frontend's
+`mediaUrl()` adds the host in dev); if storage moves to S3 they become full
+`https://` URLs, which clients should use as they are.
+
+```json
+{ "id": 4, "bio": "...", "photo_url": "/media/profile_photos/3f2a…c1.jpg",
+  "thumbnail_url": "/media/profile_photos/thumbs/3f2a…c1_thumb.jpg", "...": "..." }
+```
+
 ### Contract: connections
 
 Connections are private: you only ever see your own. Every connection is shown
@@ -65,7 +111,8 @@ from **your** point of view:
   "status": "connected",
   "user": {
     "id": 5, "username": "bob", "college_name": "TAMUT",
-    "graduation_year": 2027, "profile_id": 3
+    "graduation_year": 2027, "profile_id": 3,
+    "thumbnail_url": null
   },
   "created_at": "2026-11-01T10:00:00-05:00",
   "responded_at": "2026-11-01T10:05:00-05:00"
@@ -74,7 +121,8 @@ from **your** point of view:
 - `status`: `"connected"` (accepted), `"incoming"` (they asked you, waiting on
   you), or `"outgoing"` (you asked, waiting on them).
 - `user` is the **other** person. `profile_id` is null if they haven't set up a
-  profile yet. Link to `/profiles/<profile_id>`.
+  profile yet. Link to `/profiles/<profile_id>`. `thumbnail_url` is their 200 px
+  photo, or null (see "Contract: profile photo").
 - Declined requests are never revealed. The sender keeps seeing `"outgoing"`
   and can't send a new request (sending again just returns the same row). The
   person who declined no longer sees it.
@@ -137,7 +185,7 @@ when the other person marks the chat read.
 {
   "id": 7,
   "other_user": {"id": 5, "username": "bob", "college_name": "TAMUT",
-                 "graduation_year": 2027, "profile_id": 3},
+                 "graduation_year": 2027, "profile_id": 3, "thumbnail_url": null},
   "last_message": message | null,
   "unread_count": 2,
   "is_connected": true,
