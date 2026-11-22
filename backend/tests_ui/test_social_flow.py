@@ -17,7 +17,7 @@ from chat.models import Conversation
 from chat.services import send_message
 from connections.models import Connection
 
-from helpers import click_button, log_in_as  # tests_ui/helpers.py
+from helpers import click_button, log_in_as, open_discover  # tests_ui/helpers.py
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -115,7 +115,7 @@ def test_ui23_chat_after_disconnect_is_read_only(page, wait, alice, bob):
 # --- Discover -------------------------------------------------------------
 
 def test_ui24_discover_connect_sends_friend_request(page, wait, alice, bob):
-    log_in_as(page, alice, "/discover")
+    open_discover(page, wait, alice)
     click_button(wait, "Everyone")
 
     click_button(wait, "Connect")
@@ -126,7 +126,7 @@ def test_ui24_discover_connect_sends_friend_request(page, wait, alice, bob):
 
 
 def test_ui25_discover_remove_takes_friend_off_friends_tab(page, wait, alice, friends):
-    log_in_as(page, alice, "/discover")
+    open_discover(page, wait, alice)
     click_button(wait, "Friends")
     wait.until(EC.visibility_of_element_located((By.XPATH, "//article[contains(., 'bob')]")))
 

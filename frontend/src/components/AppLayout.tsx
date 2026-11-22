@@ -31,6 +31,9 @@ export default function AppLayout() {
             <NavLink to="/home" className={(state) => `hidden sm:inline-block ${navClass(state)}`}>
               Home
             </NavLink>
+            <NavLink to="/discover" className={navClass}>
+              Discover
+            </NavLink>
             <NavLink to="/friends" className={navClass}>
               Friends
             </NavLink>
