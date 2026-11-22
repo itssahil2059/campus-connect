@@ -14,7 +14,7 @@ from selenium.webdriver.support.ui import Select
 
 from profiles.models import Answer, Profile, Question
 
-from helpers import click_button, log_in_as, set_date  # tests_ui/helpers.py
+from helpers import click_button, log_in_as, open_discover, set_date  # tests_ui/helpers.py
 
 BIRTHDAY = "2004-03-15"  # an adult, whatever year the tests run in
 
@@ -107,7 +107,7 @@ def search_page(page, wait, alice, bob, make_student):
     """Discover > Search as Alice, with Bob (likes coffee) and Carol (night owl)."""
     Profile.objects.filter(user=bob).update(interests=["hiking"], likes=["coffee"])
     Profile.objects.create(user=make_student("carol"), bio="Night owl", interests=["hiking"])
-    log_in_as(page, alice, "/discover")
+    open_discover(page, wait, alice)
     click_button(wait, "Search")
     wait.until(lambda _: search_results(page) == ["bob", "carol"])
     return page

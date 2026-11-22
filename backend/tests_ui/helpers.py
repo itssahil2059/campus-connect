@@ -44,6 +44,15 @@ def log_in_as(browser, user, path):
     browser.get(f"{FRONTEND_URL}{path}")
 
 
+def open_discover(browser, wait, user):
+    """Log in as user, then reach Discover the way students do: the nav link."""
+    log_in_as(browser, user, "/home")
+    wait.until(
+        EC.element_to_be_clickable((By.XPATH, "//header//nav//a[normalize-space()='Discover']"))
+    ).click()
+    wait.until(EC.url_contains("/discover"))
+
+
 def click_button(wait, text):
     """Wait until a <button> with exactly this text can be clicked, then click it."""
     wait.until(

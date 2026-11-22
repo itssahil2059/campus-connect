@@ -43,11 +43,12 @@ export default function App() {
             <Route path="/friends" element={<FriendsPage />} />
             <Route path="/messages" element={<MessagesPage />} />
             <Route path="/messages/:id" element={<ChatPage />} />
+            {/* Inside the layout so it has the main navigation and needs login. */}
+            <Route path="/discover" element={<DiscoverPage />} />
           </Route>
 
           {/* Placeholders for later features. */}
           <Route path="/questionnaire" element={<QuestionnairePage />} />
-          <Route path="/discover" element={<DiscoverPage />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

@@ -675,6 +675,25 @@ and validated the Nginx config with `nginx -t` in Docker.
 
 ---
 
+## 18. Discover in the main navigation (branch `sa19-discover-nav`)
+
+**What was done**
+- Added a **Discover** link to the header, next to Home. Before, the only way
+  in was typing `/discover`.
+- `/discover` now sits inside the logged-in layout, so it has the header and
+  needs a login like every other page. The Discover page itself is unchanged.
+- The Selenium tests for Discover (UI-15, 16, 24, 25) now get there by
+  clicking the nav link, so a missing link would fail the tests.
+
+**Talking point**
+- *How it got lost:* "Discover's only entry point was a button on Trinity's
+  Messages page. When we merged her branch, we kept the newer Messages page
+  that talks to the real chat API, and the button went with the old one. The
+  tests didn't notice because they opened `/discover` by URL. Now they click
+  the link like a student would."
+
+---
+
 ## Git workflow (worth mentioning — version control is 25% of the grade)
 - Feature branches per task (`sa1-api-docs`, `sa2-auth`), merged into `dev`
   via pull requests. Teammates use the same flow (`setup-cezar`,
